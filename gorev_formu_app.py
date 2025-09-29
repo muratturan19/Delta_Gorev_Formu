@@ -14,6 +14,7 @@ class GorevFormuApp:
         self.root = root
         self.root.title("Delta Proje - Görev Formu Sistemi")
         self.root.geometry("800x600")
+        self.root.minsize(900, 650)
         self.root.configure(bg='#f5f5f5')
 
         # Mod: 'menu', 'new', 'edit'
@@ -480,7 +481,7 @@ class GorevFormuApp:
         tk.Label(self.main_frame, text="🕐 Saat ve Tarih Bilgileri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         # Scroll frame
-        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0)
+        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, width=700, height=450)
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
@@ -493,7 +494,7 @@ class GorevFormuApp:
         canvas.configure(yscrollcommand=scrollbar.set)
 
         form_frame = tk.Frame(scrollable_frame, bg='white')
-        form_frame.pack(pady=10, padx=20)
+        form_frame.pack(pady=10, padx=50, fill='both', expand=True)
 
         row = 0
 
@@ -733,7 +734,7 @@ class GorevFormuApp:
         ).pack(pady=20)
 
         # Ana canvas ve scrollbar
-        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, height=460)
+        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0)
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
@@ -756,7 +757,12 @@ class GorevFormuApp:
         grid_frame.pack(fill='both', expand=True, padx=3, pady=3)
 
         for col in range(6):
-            grid_frame.grid_columnconfigure(col, weight=1, uniform='col')
+            if col in [0, 1]:
+                grid_frame.grid_columnconfigure(col, weight=1, minsize=120)
+            elif col == 4:
+                grid_frame.grid_columnconfigure(col, weight=1, minsize=100)
+            else:
+                grid_frame.grid_columnconfigure(col, weight=2, minsize=150)
 
         def create_cell(row, column, text='', colspan=1, rowspan=1, bg='white', fg='#000',
                         font=('Arial', 10), anchor='w', padx=8, pady=6, wrap=None,
@@ -951,7 +957,7 @@ class GorevFormuApp:
         create_cell(current_row, 0, "DURUM", colspan=2, bg=status_bg, fg=status_fg, font=('Arial', 12, 'bold'), anchor='center')
         create_cell(current_row, 2, status, colspan=4, bg=status_value_bg, fg=status_value_fg, font=('Arial', 12, 'bold'), anchor='center')
 
-        canvas.pack(side="left", fill="both", expand=True)
+        canvas.pack(side="left", fill="both", expand=True, pady=10)
         scrollbar.pack(side="right", fill="y")
 
         # Butonlar
@@ -1386,7 +1392,7 @@ class GorevFormuApp:
     def handle_save_button(self):
         """Kaydet butonu davranışı"""
         self.collect_form_data()
-        self.save_form(stay_on_step=True)
+        self.save_form(stay_on_step=False)
 
     def next_step(self, save_partial=False):
         """Sonraki adım"""
