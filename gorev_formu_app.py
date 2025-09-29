@@ -555,9 +555,11 @@ class GorevFormuApp:
 
         yola_cikis_saat = ttk.Spinbox(saat_frame1, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
         yola_cikis_saat.pack(side='left')
+        yola_cikis_saat.set('00')
         tk.Label(saat_frame1, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         yola_cikis_dakika = ttk.Spinbox(saat_frame1, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
         yola_cikis_dakika.pack(side='left')
+        yola_cikis_dakika.set('00')
 
         if self.form_data.get('yola_cikis_saat'):
             try:
@@ -589,9 +591,11 @@ class GorevFormuApp:
 
         donus_saat = ttk.Spinbox(saat_frame2, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
         donus_saat.pack(side='left')
+        donus_saat.set('00')
         tk.Label(saat_frame2, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         donus_dakika = ttk.Spinbox(saat_frame2, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
         donus_dakika.pack(side='left')
+        donus_dakika.set('00')
 
         if self.form_data.get('donus_saat'):
             try:
@@ -623,9 +627,11 @@ class GorevFormuApp:
 
         calisma_baslangic_saat = ttk.Spinbox(saat_frame3, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
         calisma_baslangic_saat.pack(side='left')
+        calisma_baslangic_saat.set('00')
         tk.Label(saat_frame3, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         calisma_baslangic_dakika = ttk.Spinbox(saat_frame3, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
         calisma_baslangic_dakika.pack(side='left')
+        calisma_baslangic_dakika.set('00')
 
         if self.form_data.get('calisma_baslangic_saat'):
             try:
@@ -657,9 +663,11 @@ class GorevFormuApp:
 
         calisma_bitis_saat = ttk.Spinbox(saat_frame4, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
         calisma_bitis_saat.pack(side='left')
+        calisma_bitis_saat.set('00')
         tk.Label(saat_frame4, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         calisma_bitis_dakika = ttk.Spinbox(saat_frame4, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
         calisma_bitis_dakika.pack(side='left')
+        calisma_bitis_dakika.set('00')
 
         if self.form_data.get('calisma_bitis_saat'):
             try:
@@ -746,7 +754,7 @@ class GorevFormuApp:
         tk.Label(self.main_frame, text="📊 Form Özeti", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         # Ana canvas ve scrollbar
-        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0)
+        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, height=450)
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
@@ -759,7 +767,7 @@ class GorevFormuApp:
         canvas.configure(yscrollcommand=scrollbar.set)
 
         # Özet içeriği
-        summary_frame = tk.Frame(scrollable_frame, bg='white', padx=20, pady=20)
+        summary_frame = tk.Frame(scrollable_frame, bg='white', padx=30, pady=30)
         summary_frame.pack(fill='both', expand=True)
 
         # Başlık kutusu
@@ -871,7 +879,7 @@ class GorevFormuApp:
         # Başlık
         title_frame = tk.Frame(section_frame, bg='#ffeb3b', padx=10, pady=5)
         title_frame.pack(fill='x')
-        tk.Label(title_frame, text=title, font=('Arial', 11, 'bold'),
+        tk.Label(title_frame, text=title, font=('Arial', 12, 'bold'),
                 bg='#ffeb3b', fg='#000', anchor='w').pack(fill='x')
 
         # Veri satırları
@@ -881,7 +889,7 @@ class GorevFormuApp:
 
             # Label
             tk.Label(row_frame, text=f"{label}:", font=('Arial', 10, 'bold'),
-                    bg='white', fg='#333', anchor='w', width=20).pack(side='left')
+                    bg='white', fg='#333', anchor='w', width=25).pack(side='left')
 
             # Value - uzun metinler için text widget
             if len(str(value)) > 50:
