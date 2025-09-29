@@ -481,7 +481,7 @@ class GorevFormuApp:
         tk.Label(self.main_frame, text="🕐 Saat ve Tarih Bilgileri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         # Scroll frame
-        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, width=700, height=450)
+        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, height=450)
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
@@ -494,12 +494,16 @@ class GorevFormuApp:
         canvas.configure(yscrollcommand=scrollbar.set)
 
         form_frame = tk.Frame(scrollable_frame, bg='white')
-        form_frame.pack(pady=10, padx=50, fill='both', expand=True)
+        form_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+        for col in range(5):
+            weight = 0 if col == 4 else 1
+            form_frame.grid_columnconfigure(col, weight=weight)
 
         row = 0
 
         # Yola Çıkış
-        tk.Label(form_frame, text="Yola Çıkış:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='w', pady=10)
+        tk.Label(form_frame, text="Yola Çıkış:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='ew', pady=10)
         tk.Label(form_frame, text="Tarih:", bg='white').grid(row=row, column=1, sticky='e', padx=5)
         yola_cikis_tarih = DateEntry(form_frame, font=('Arial', 11), width=12, background='#4dd0e1',
                                       foreground='white', borderwidth=2, date_pattern='dd.mm.yyyy',
@@ -538,7 +542,7 @@ class GorevFormuApp:
         row += 1
 
         # Dönüş
-        tk.Label(form_frame, text="Dönüş:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='w', pady=10)
+        tk.Label(form_frame, text="Dönüş:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='ew', pady=10)
         tk.Label(form_frame, text="Tarih:", bg='white').grid(row=row, column=1, sticky='e', padx=5)
         donus_tarih = DateEntry(form_frame, font=('Arial', 11), width=12, background='#4dd0e1',
                                foreground='white', borderwidth=2, date_pattern='dd.mm.yyyy',
@@ -576,7 +580,7 @@ class GorevFormuApp:
         row += 1
 
         # Çalışma Başlangıç
-        tk.Label(form_frame, text="Çalışma Başlangıç:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='w', pady=10)
+        tk.Label(form_frame, text="Çalışma Başlangıç:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='ew', pady=10)
         tk.Label(form_frame, text="Tarih:", bg='white').grid(row=row, column=1, sticky='e', padx=5)
         calisma_baslangic_tarih = DateEntry(form_frame, font=('Arial', 11), width=12, background='#4dd0e1',
                                            foreground='white', borderwidth=2, date_pattern='dd.mm.yyyy',
@@ -614,7 +618,7 @@ class GorevFormuApp:
         row += 1
 
         # Çalışma Bitiş
-        tk.Label(form_frame, text="Çalışma Bitiş:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='w', pady=10)
+        tk.Label(form_frame, text="Çalışma Bitiş:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='ew', pady=10)
         tk.Label(form_frame, text="Tarih:", bg='white').grid(row=row, column=1, sticky='e', padx=5)
         calisma_bitis_tarih = DateEntry(form_frame, font=('Arial', 11), width=12, background='#4dd0e1',
                                         foreground='white', borderwidth=2, date_pattern='dd.mm.yyyy',
@@ -652,11 +656,11 @@ class GorevFormuApp:
         row += 1
 
         # Mola Süresi
-        tk.Label(form_frame, text="Toplam Mola Süresi:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='w', pady=10)
+        tk.Label(form_frame, text="Toplam Mola Süresi:", font=('Arial', 12, 'bold'), bg='white').grid(row=row, column=0, sticky='ew', pady=10)
         mola_suresi = ttk.Spinbox(form_frame, from_=0, to=480, width=10, font=('Arial', 11))
         mola_suresi.set(self.form_data.get('mola_suresi', '0'))
         mola_suresi.grid(row=row, column=2, padx=5)
-        tk.Label(form_frame, text="dakika", bg='white').grid(row=row, column=3, sticky='w', padx=5)
+        tk.Label(form_frame, text="dakika", bg='white').grid(row=row, column=3, sticky='ew', padx=5)
 
         # Widget'ları sakla
         self.yola_cikis_tarih_entry = yola_cikis_tarih
@@ -1339,7 +1343,7 @@ class GorevFormuApp:
 
         # Butonları ortala
         center_frame = tk.Frame(btn_frame, bg='white')
-        center_frame.pack(expand=True)
+        center_frame.pack(anchor='center', pady=10)
 
         if self.current_step > 0:
             btn_geri = tk.Button(
