@@ -133,7 +133,7 @@ class GorevFormuApp:
     def start_new_form(self):
         """Yeni form oluştur"""
         self.mode = 'new'
-        self.form_data = {}
+        self.form_data = {'durum': 'YARIM'}
         self.current_step = 0
         self.form_no = self.get_next_form_no()
         self.is_readonly = False
@@ -275,9 +275,9 @@ class GorevFormuApp:
 
             self.form_data = {
                 'form_no': form_no,
-                'tarih': raw_data.get('Tarih', ''),
-                'dok_no': raw_data.get('DOK.NO', ''),
-                'rev_no': raw_data.get('REV.NO/TRH', ''),
+                'tarih': raw_data.get('Tarih', '') or '',
+                'dok_no': raw_data.get('DOK.NO', '') or '',
+                'rev_no': raw_data.get('REV.NO/TRH', '') or '',
                 'avans': raw_data.get('Avans Tutarı', '') or '',
                 'taseron': raw_data.get('Taşeron Şirket', '') or '',
                 'gorev_tanimi': raw_data.get('Görevin Tanımı', '') or '',
@@ -288,9 +288,7 @@ class GorevFormuApp:
 
             for i in range(1, 6):
                 key = f'Personel {i}'
-                value = raw_data.get(key, '')
-                if value:
-                    self.form_data[f'personel_{i}'] = value
+                self.form_data[f'personel_{i}'] = raw_data.get(key, '') or ''
 
             # Tarih-saat alanlarını işle
             yola_tarih, yola_saat = parse_datetime_cell(raw_data.get('Yola Çıkış'))
@@ -298,34 +296,23 @@ class GorevFormuApp:
             calisma_baslangic_tarih, calisma_baslangic_saat = parse_datetime_cell(raw_data.get('Çalışma Başlangıç'))
             calisma_bitis_tarih, calisma_bitis_saat = parse_datetime_cell(raw_data.get('Çalışma Bitiş'))
 
-            if yola_tarih:
-                self.form_data['yola_cikis_tarih'] = yola_tarih
-            if yola_saat:
-                self.form_data['yola_cikis_saat'] = yola_saat
-            if donus_tarih:
-                self.form_data['donus_tarih'] = donus_tarih
-            if donus_saat:
-                self.form_data['donus_saat'] = donus_saat
-            if calisma_baslangic_tarih:
-                self.form_data['calisma_baslangic_tarih'] = calisma_baslangic_tarih
-            if calisma_baslangic_saat:
-                self.form_data['calisma_baslangic_saat'] = calisma_baslangic_saat
-            if calisma_bitis_tarih:
-                self.form_data['calisma_bitis_tarih'] = calisma_bitis_tarih
-            if calisma_bitis_saat:
-                self.form_data['calisma_bitis_saat'] = calisma_bitis_saat
+            self.form_data['yola_cikis_tarih'] = yola_tarih
+            self.form_data['yola_cikis_saat'] = yola_saat
+            self.form_data['donus_tarih'] = donus_tarih
+            self.form_data['donus_saat'] = donus_saat
+            self.form_data['calisma_baslangic_tarih'] = calisma_baslangic_tarih
+            self.form_data['calisma_baslangic_saat'] = calisma_baslangic_saat
+            self.form_data['calisma_bitis_tarih'] = calisma_bitis_tarih
+            self.form_data['calisma_bitis_saat'] = calisma_bitis_saat
 
             mola_value = clean_mola_value(raw_data.get('Toplam Mola'))
-            if mola_value:
-                self.form_data['mola_suresi'] = mola_value
+            self.form_data['mola_suresi'] = mola_value or ''
 
-            durum = (raw_data.get('DURUM') or '').strip().upper()
+            durum = (raw_data.get('DURUM') or '').strip().upper() or 'YARIM'
+            self.form_data['durum'] = durum
 
-            if durum == 'TAMAMLANDI':
-                self.current_step = 8  # Özet ekranını göster
-            else:
-                self.current_step = 5  # Saat bilgileri adımından başla
-
+            self.current_step = 0
+            self.is_readonly = False
             self.show_step()
 
         except Exception as e:
@@ -335,13 +322,6 @@ class GorevFormuApp:
     def show_step(self):
         """Adımları göster"""
         self.clear_frame()
-
-        # Mod kontrolü
-        if self.mode == 'new':
-            # Yeni form: 0-4 arası adımlar (Görev Yeri'ne kadar)
-            if self.current_step > 4:
-                self.save_partial_form()
-                return
 
         if self.current_step == 0:
             self.step_0_form_bilgileri()
@@ -400,8 +380,6 @@ class GorevFormuApp:
 
     def step_1_gorevli_personel(self):
         """Adım 1: Görevli personel"""
-        readonly = self.mode == 'edit'
-
         tk.Label(self.main_frame, text="👥 Görevli Personel", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         personel_options = [
@@ -418,17 +396,13 @@ class GorevFormuApp:
         for i in range(5):
             tk.Label(form_frame, text=f"Personel {i+1}:", font=('Arial', 12, 'bold'), bg='white').grid(row=i, column=0, sticky='w', pady=10, padx=10)
 
-            if readonly:
-                value = self.form_data.get(f'personel_{i+1}', '')
-                label = tk.Label(form_frame, text=value, font=('Arial', 12), bg='#f0f0f0', width=25, anchor='w')
-                label.grid(row=i, column=1, padx=10, pady=10)
-            else:
-                combo = ttk.Combobox(form_frame, values=personel_options, font=('Arial', 12), width=23, state='readonly')
-                combo.set(self.form_data.get(f'personel_{i+1}', ''))
-                combo.grid(row=i, column=1, padx=10, pady=10)
-                self.personel_combos.append(combo)
+            combo_values = [''] + personel_options
+            combo = ttk.Combobox(form_frame, values=combo_values, font=('Arial', 12), width=23, state='readonly')
+            combo.set(self.form_data.get(f'personel_{i+1}', ''))
+            combo.grid(row=i, column=1, padx=10, pady=10)
+            self.personel_combos.append(combo)
 
-        if not readonly and self.personel_combos:
+        if self.personel_combos:
 
             def check_duplicate_personel(event=None):
                 """Aynı personelin birden fazla seçilmesini engelle"""
@@ -451,12 +425,10 @@ class GorevFormuApp:
             # Var olan seçimleri doğrula
             check_duplicate_personel()
 
-        self.add_navigation_buttons(readonly)
+        self.add_navigation_buttons(False)
 
     def step_2_avans_taseron(self):
         """Adım 2: Avans ve Taşeron"""
-        readonly = self.mode == 'edit'
-
         tk.Label(self.main_frame, text="💰 Avans ve Taşeron Bilgileri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         form_frame = tk.Frame(self.main_frame, bg='white')
@@ -467,59 +439,43 @@ class GorevFormuApp:
         self.avans_entry = tk.Entry(form_frame, font=('Arial', 12), width=30)
         self.avans_entry.insert(0, self.form_data.get('avans', ''))
         self.avans_entry.grid(row=0, column=1, padx=10, pady=15)
-        if readonly:
-            self.avans_entry.config(state='readonly', bg='#f0f0f0')
 
         # Taşeron
         tk.Label(form_frame, text="Taşeron Şirket:", font=('Arial', 12, 'bold'), bg='white').grid(row=1, column=0, sticky='w', pady=15)
 
         taseron_options = ["Yok", "ABC İnşaat", "XYZ Teknik", "Marmara Mühendislik", "Anadolu Yapı"]
 
-        if readonly:
-            value = self.form_data.get('taseron', '')
-            label = tk.Label(form_frame, text=value, font=('Arial', 12), bg='#f0f0f0', width=28, anchor='w')
-            label.grid(row=1, column=1, padx=10, pady=15)
-        else:
-            self.taseron_combo = ttk.Combobox(form_frame, values=taseron_options, font=('Arial', 12), width=28)
-            self.taseron_combo.set(self.form_data.get('taseron', ''))
-            self.taseron_combo.grid(row=1, column=1, padx=10, pady=15)
+        combo_values = [''] + taseron_options
+        self.taseron_combo = ttk.Combobox(form_frame, values=combo_values, font=('Arial', 12), width=28)
+        self.taseron_combo.set(self.form_data.get('taseron', ''))
+        self.taseron_combo.grid(row=1, column=1, padx=10, pady=15)
 
-        self.add_navigation_buttons(readonly)
+        self.add_navigation_buttons(False)
 
     def step_3_gorev_tanimi(self):
         """Adım 3: Görev Tanımı"""
-        readonly = self.mode == 'edit'
-
         tk.Label(self.main_frame, text="📝 Görevin Tanımı", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         self.gorev_tanimi_text = scrolledtext.ScrolledText(self.main_frame, font=('Arial', 11), width=70, height=15, wrap='word')
         self.gorev_tanimi_text.pack(pady=20, padx=20)
         self.gorev_tanimi_text.insert('1.0', self.form_data.get('gorev_tanimi', ''))
 
-        if readonly:
-            self.gorev_tanimi_text.config(state='disabled', bg='#f0f0f0')
-
-        self.add_navigation_buttons(readonly)
+        self.add_navigation_buttons(False)
 
     def step_4_gorev_yeri(self):
         """Adım 4: Görev Yeri"""
-        readonly = self.mode == 'edit'
-
         tk.Label(self.main_frame, text="📍 Görev Yeri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         self.gorev_yeri_text = scrolledtext.ScrolledText(self.main_frame, font=('Arial', 11), width=70, height=15, wrap='word')
         self.gorev_yeri_text.pack(pady=20, padx=20)
         self.gorev_yeri_text.insert('1.0', self.form_data.get('gorev_yeri', ''))
 
-        if readonly:
-            self.gorev_yeri_text.config(state='disabled', bg='#f0f0f0')
-
-        self.add_navigation_buttons(readonly)
+        self.add_navigation_buttons(False)
 
     def step_5_saat_bilgileri(self):
         """Adım 5: Saat bilgileri"""
-        saat_list = [f"{i:02d}" for i in range(24)]
-        dakika_list = [f"{i:02d}" for i in range(60)]
+        saat_list = [''] + [f"{i:02d}" for i in range(24)]
+        dakika_list = [''] + [f"{i:02d}" for i in range(60)]
 
         tk.Label(self.main_frame, text="🕐 Saat ve Tarih Bilgileri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
@@ -553,6 +509,8 @@ class GorevFormuApp:
                 yola_cikis_tarih.set_date(datetime.strptime(self.form_data.get('yola_cikis_tarih'), '%d.%m.%Y'))
             except:
                 pass
+        else:
+            yola_cikis_tarih.delete(0, 'end')
 
         tk.Label(form_frame, text="Saat:", bg='white').grid(row=row, column=3, sticky='e', padx=5)
 
@@ -561,11 +519,11 @@ class GorevFormuApp:
         saat_frame1.grid(row=row, column=4, padx=5)
 
         yola_cikis_saat = ttk.Combobox(saat_frame1, values=saat_list, width=3, state='readonly', font=('Arial', 11))
-        yola_cikis_saat.set('00')
+        yola_cikis_saat.set('')
         yola_cikis_saat.pack(side='left')
         tk.Label(saat_frame1, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         yola_cikis_dakika = ttk.Combobox(saat_frame1, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
-        yola_cikis_dakika.set('00')
+        yola_cikis_dakika.set('')
         yola_cikis_dakika.pack(side='left')
 
         if self.form_data.get('yola_cikis_saat'):
@@ -590,6 +548,8 @@ class GorevFormuApp:
                 donus_tarih.set_date(datetime.strptime(self.form_data.get('donus_tarih'), '%d.%m.%Y'))
             except:
                 pass
+        else:
+            donus_tarih.delete(0, 'end')
 
         tk.Label(form_frame, text="Saat:", bg='white').grid(row=row, column=3, sticky='e', padx=5)
 
@@ -597,11 +557,11 @@ class GorevFormuApp:
         saat_frame2.grid(row=row, column=4, padx=5)
 
         donus_saat = ttk.Combobox(saat_frame2, values=saat_list, width=3, state='readonly', font=('Arial', 11))
-        donus_saat.set('00')
+        donus_saat.set('')
         donus_saat.pack(side='left')
         tk.Label(saat_frame2, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         donus_dakika = ttk.Combobox(saat_frame2, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
-        donus_dakika.set('00')
+        donus_dakika.set('')
         donus_dakika.pack(side='left')
 
         if self.form_data.get('donus_saat'):
@@ -626,6 +586,8 @@ class GorevFormuApp:
                 calisma_baslangic_tarih.set_date(datetime.strptime(self.form_data.get('calisma_baslangic_tarih'), '%d.%m.%Y'))
             except:
                 pass
+        else:
+            calisma_baslangic_tarih.delete(0, 'end')
 
         tk.Label(form_frame, text="Saat:", bg='white').grid(row=row, column=3, sticky='e', padx=5)
 
@@ -633,11 +595,11 @@ class GorevFormuApp:
         saat_frame3.grid(row=row, column=4, padx=5)
 
         calisma_baslangic_saat = ttk.Combobox(saat_frame3, values=saat_list, width=3, state='readonly', font=('Arial', 11))
-        calisma_baslangic_saat.set('00')
+        calisma_baslangic_saat.set('')
         calisma_baslangic_saat.pack(side='left')
         tk.Label(saat_frame3, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         calisma_baslangic_dakika = ttk.Combobox(saat_frame3, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
-        calisma_baslangic_dakika.set('00')
+        calisma_baslangic_dakika.set('')
         calisma_baslangic_dakika.pack(side='left')
 
         if self.form_data.get('calisma_baslangic_saat'):
@@ -662,6 +624,8 @@ class GorevFormuApp:
                 calisma_bitis_tarih.set_date(datetime.strptime(self.form_data.get('calisma_bitis_tarih'), '%d.%m.%Y'))
             except:
                 pass
+        else:
+            calisma_bitis_tarih.delete(0, 'end')
 
         tk.Label(form_frame, text="Saat:", bg='white').grid(row=row, column=3, sticky='e', padx=5)
 
@@ -669,11 +633,11 @@ class GorevFormuApp:
         saat_frame4.grid(row=row, column=4, padx=5)
 
         calisma_bitis_saat = ttk.Combobox(saat_frame4, values=saat_list, width=3, state='readonly', font=('Arial', 11))
-        calisma_bitis_saat.set('00')
+        calisma_bitis_saat.set('')
         calisma_bitis_saat.pack(side='left')
         tk.Label(saat_frame4, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
         calisma_bitis_dakika = ttk.Combobox(saat_frame4, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
-        calisma_bitis_dakika.set('00')
+        calisma_bitis_dakika.set('')
         calisma_bitis_dakika.pack(side='left')
 
         if self.form_data.get('calisma_bitis_saat'):
@@ -727,7 +691,7 @@ class GorevFormuApp:
             "16 JKL 012", "35 MNO 345"
         ]
 
-        self.arac_combo = ttk.Combobox(form_frame, values=arac_options, font=('Arial', 12), width=28, state='readonly')
+        self.arac_combo = ttk.Combobox(form_frame, values=[''] + arac_options, font=('Arial', 12), width=28, state='readonly')
         self.arac_combo.set(self.form_data.get('arac_plaka', ''))
         self.arac_combo.grid(row=0, column=1, padx=10, pady=15)
 
@@ -747,7 +711,7 @@ class GorevFormuApp:
             "Veli Çelik", "Hasan Şahin"
         ]
 
-        self.hazirlayan_combo = ttk.Combobox(form_frame, values=hazirlayan_options, font=('Arial', 12), width=28, state='readonly')
+        self.hazirlayan_combo = ttk.Combobox(form_frame, values=[''] + hazirlayan_options, font=('Arial', 12), width=28, state='readonly')
         self.hazirlayan_combo.set(self.form_data.get('hazirlayan', ''))
         self.hazirlayan_combo.grid(row=0, column=1, padx=10, pady=15)
 
@@ -757,6 +721,8 @@ class GorevFormuApp:
         """Özet ekranı"""
         # Önce tüm verileri topla
         self.collect_form_data()
+        status = self.determine_form_status()
+        self.form_data['durum'] = status
 
         tk.Label(
             self.main_frame,
@@ -977,8 +943,13 @@ class GorevFormuApp:
         create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
 
         current_row += 1
-        create_cell(current_row, 0, "DURUM", colspan=2, bg='#4caf50', fg='white', font=('Arial', 12, 'bold'), anchor='center')
-        create_cell(current_row, 2, "TAMAMLANDI", colspan=4, bg='#c8e6c9', fg='#1b5e20', font=('Arial', 12, 'bold'), anchor='center')
+        status_bg = '#4caf50' if status == 'TAMAMLANDI' else '#ff9800'
+        status_fg = 'white'
+        status_value_bg = '#c8e6c9' if status == 'TAMAMLANDI' else '#ffe082'
+        status_value_fg = '#1b5e20' if status == 'TAMAMLANDI' else '#bf360c'
+
+        create_cell(current_row, 0, "DURUM", colspan=2, bg=status_bg, fg=status_fg, font=('Arial', 12, 'bold'), anchor='center')
+        create_cell(current_row, 2, status, colspan=4, bg=status_value_bg, fg=status_value_fg, font=('Arial', 12, 'bold'), anchor='center')
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -1056,15 +1027,13 @@ class GorevFormuApp:
             if hasattr(self, 'personel_combos'):
                 for i, combo in enumerate(self.personel_combos):
                     if combo.winfo_exists():
-                        value = combo.get()
-                        if value:
-                            self.form_data[f'personel_{i+1}'] = value
+                        self.form_data[f'personel_{i+1}'] = combo.get().strip()
 
             # Avans ve Taşeron
             if hasattr(self, 'avans_entry') and self.avans_entry.winfo_exists():
-                self.form_data['avans'] = self.avans_entry.get()
+                self.form_data['avans'] = self.avans_entry.get().strip()
             if hasattr(self, 'taseron_combo') and self.taseron_combo.winfo_exists():
-                self.form_data['taseron'] = self.taseron_combo.get()
+                self.form_data['taseron'] = self.taseron_combo.get().strip()
 
             # Görev tanımı ve yeri
             if hasattr(self, 'gorev_tanimi_text') and self.gorev_tanimi_text.winfo_exists():
@@ -1075,36 +1044,52 @@ class GorevFormuApp:
             # Saat bilgileri
             if hasattr(self, 'yola_cikis_tarih_entry'):
                 if self.yola_cikis_tarih_entry.winfo_exists():
-                    self.form_data['yola_cikis_tarih'] = self.yola_cikis_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.yola_cikis_saat_combo.get() or 0)
-                    m = int(self.yola_cikis_dakika_combo.get() or 0)
-                    self.form_data['yola_cikis_saat'] = f"{h:02d}:{m:02d}"
+                    self.form_data['yola_cikis_tarih'] = self.yola_cikis_tarih_entry.get().strip()
+                    saat = self.yola_cikis_saat_combo.get().strip()
+                    dakika = self.yola_cikis_dakika_combo.get().strip()
+                    self.form_data['yola_cikis_saat'] = f"{saat}:{dakika}".strip(':') if (saat or dakika) else ''
 
-                    self.form_data['donus_tarih'] = self.donus_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.donus_saat_combo.get() or 0)
-                    m = int(self.donus_dakika_combo.get() or 0)
-                    self.form_data['donus_saat'] = f"{h:02d}:{m:02d}"
+                    self.form_data['donus_tarih'] = self.donus_tarih_entry.get().strip()
+                    saat = self.donus_saat_combo.get().strip()
+                    dakika = self.donus_dakika_combo.get().strip()
+                    self.form_data['donus_saat'] = f"{saat}:{dakika}".strip(':') if (saat or dakika) else ''
 
-                    self.form_data['calisma_baslangic_tarih'] = self.calisma_baslangic_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.calisma_baslangic_saat_combo.get() or 0)
-                    m = int(self.calisma_baslangic_dakika_combo.get() or 0)
-                    self.form_data['calisma_baslangic_saat'] = f"{h:02d}:{m:02d}"
+                    self.form_data['calisma_baslangic_tarih'] = self.calisma_baslangic_tarih_entry.get().strip()
+                    saat = self.calisma_baslangic_saat_combo.get().strip()
+                    dakika = self.calisma_baslangic_dakika_combo.get().strip()
+                    self.form_data['calisma_baslangic_saat'] = f"{saat}:{dakika}".strip(':') if (saat or dakika) else ''
 
-                    self.form_data['calisma_bitis_tarih'] = self.calisma_bitis_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.calisma_bitis_saat_combo.get() or 0)
-                    m = int(self.calisma_bitis_dakika_combo.get() or 0)
-                    self.form_data['calisma_bitis_saat'] = f"{h:02d}:{m:02d}"
+                    self.form_data['calisma_bitis_tarih'] = self.calisma_bitis_tarih_entry.get().strip()
+                    saat = self.calisma_bitis_saat_combo.get().strip()
+                    dakika = self.calisma_bitis_dakika_combo.get().strip()
+                    self.form_data['calisma_bitis_saat'] = f"{saat}:{dakika}".strip(':') if (saat or dakika) else ''
 
-                    self.form_data['mola_suresi'] = self.mola_suresi_spin.get()
+                    self.form_data['mola_suresi'] = self.mola_suresi_spin.get().strip()
 
             # Araç ve hazırlayan
             if hasattr(self, 'arac_combo') and self.arac_combo.winfo_exists():
-                self.form_data['arac_plaka'] = self.arac_combo.get()
+                self.form_data['arac_plaka'] = self.arac_combo.get().strip()
             if hasattr(self, 'hazirlayan_combo') and self.hazirlayan_combo.winfo_exists():
-                self.form_data['hazirlayan'] = self.hazirlayan_combo.get()
+                self.form_data['hazirlayan'] = self.hazirlayan_combo.get().strip()
 
         except Exception as e:
             print(f"Veri toplama hatası: {e}")
+
+    def determine_form_status(self):
+        """Form durumunu belirle"""
+        required_fields = [
+            'yola_cikis_tarih', 'yola_cikis_saat',
+            'calisma_baslangic_tarih', 'calisma_baslangic_saat',
+            'calisma_bitis_tarih', 'calisma_bitis_saat',
+            'donus_tarih', 'donus_saat'
+        ]
+
+        for key in required_fields:
+            value = (self.form_data.get(key) or '').strip()
+            if not value:
+                return 'YARIM'
+
+        return 'TAMAMLANDI'
 
     def save_partial_form(self):
         """Kısmi formu kaydet (Görev Yeri'ne kadar)"""
@@ -1208,6 +1193,8 @@ class GorevFormuApp:
 
             wb.save(filename)
 
+            self.form_data['durum'] = 'YARIM'
+
             messagebox.showinfo(
                 "Başarılı",
                 f"Form oluşturuldu!\n\nForm No: {self.form_no}\nDosya: {filename}\n\nGörev tamamlandığında 'GÖREV FORMU ÇAĞIR' ile bu formu açıp kalan kısımları doldurun."
@@ -1218,11 +1205,14 @@ class GorevFormuApp:
         except Exception as e:
             messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
 
-    def save_form(self):
-        """Tam formu kaydet"""
+    def save_form(self, stay_on_step=False):
+        """Formu kaydet"""
         self.collect_form_data()
 
         filename = self.get_excel_filename(self.form_no)
+
+        status = self.determine_form_status()
+        self.form_data['durum'] = status
 
         try:
             wb = openpyxl.Workbook()
@@ -1231,6 +1221,8 @@ class GorevFormuApp:
 
             # Stil
             header_fill = PatternFill(start_color='FFEB3B', end_color='FFEB3B', fill_type='solid')
+            status_fill = PatternFill(start_color='4CAF50', end_color='4CAF50', fill_type='solid') if status == 'TAMAMLANDI' else PatternFill(start_color='FF9800', end_color='FF9800', fill_type='solid')
+            status_value_fill = PatternFill(start_color='81C784', end_color='81C784', fill_type='solid') if status == 'TAMAMLANDI' else PatternFill(start_color='FFC107', end_color='FFC107', fill_type='solid')
 
             row = 1
 
@@ -1266,6 +1258,16 @@ class GorevFormuApp:
 
             row += 1
 
+            def format_datetime(date_key, time_key):
+                tarih = (self.form_data.get(date_key) or '').strip()
+                saat = (self.form_data.get(time_key) or '').strip()
+                if tarih and saat:
+                    return f"{tarih} {saat}"
+                return tarih or saat
+
+            mola = (self.form_data.get('mola_suresi') or '').strip()
+            mola_text = f"{mola} dakika" if mola else ''
+
             # Diğer tüm alanlar
             all_data = [
                 ("Avans Tutarı", self.form_data.get('avans', '')),
@@ -1273,16 +1275,16 @@ class GorevFormuApp:
                 ("Görevin Tanımı", self.form_data.get('gorev_tanimi', '')),
                 ("Görev Yeri", self.form_data.get('gorev_yeri', '')),
                 ("", ""),
-                ("Yola Çıkış", f"{self.form_data.get('yola_cikis_tarih', '')} {self.form_data.get('yola_cikis_saat', '')}"),
-                ("Dönüş", f"{self.form_data.get('donus_tarih', '')} {self.form_data.get('donus_saat', '')}"),
-                ("Çalışma Başlangıç", f"{self.form_data.get('calisma_baslangic_tarih', '')} {self.form_data.get('calisma_baslangic_saat', '')}"),
-                ("Çalışma Bitiş", f"{self.form_data.get('calisma_bitis_tarih', '')} {self.form_data.get('calisma_bitis_saat', '')}"),
-                ("Toplam Mola", f"{self.form_data.get('mola_suresi', '')} dakika"),
+                ("Yola Çıkış", format_datetime('yola_cikis_tarih', 'yola_cikis_saat')),
+                ("Dönüş", format_datetime('donus_tarih', 'donus_saat')),
+                ("Çalışma Başlangıç", format_datetime('calisma_baslangic_tarih', 'calisma_baslangic_saat')),
+                ("Çalışma Bitiş", format_datetime('calisma_bitis_tarih', 'calisma_bitis_saat')),
+                ("Toplam Mola", mola_text),
                 ("", ""),
                 ("Araç Plaka No", self.form_data.get('arac_plaka', '')),
                 ("Hazırlayan", self.form_data.get('hazirlayan', '')),
                 ("", ""),
-                ("DURUM", "TAMAMLANDI"),
+                ("DURUM", status),
             ]
 
             for label, value in all_data:
@@ -1290,8 +1292,8 @@ class GorevFormuApp:
                     ws[f'A{row}'] = label
                     ws[f'A{row}'].font = Font(bold=True)
                     if label == "DURUM":
-                        ws[f'A{row}'].fill = PatternFill(start_color='4CAF50', end_color='4CAF50', fill_type='solid')
-                        ws[f'B{row}'].fill = PatternFill(start_color='81C784', end_color='81C784', fill_type='solid')
+                        ws[f'A{row}'].fill = status_fill
+                        ws[f'B{row}'].fill = status_value_fill
                     else:
                         ws[f'A{row}'].fill = header_fill
                     ws[f'B{row}'] = value
@@ -1303,12 +1305,17 @@ class GorevFormuApp:
 
             wb.save(filename)
 
-            messagebox.showinfo(
-                "Başarılı",
-                f"Form başarıyla tamamlandı ve kaydedildi!\n\nForm No: {self.form_no}\nDosya: {filename}"
-            )
-
-            self.show_main_menu()
+            if stay_on_step:
+                messagebox.showinfo(
+                    "Kaydedildi",
+                    f"Form {status} olarak kaydedildi.\n\nForm No: {self.form_no}\nDosya: {filename}"
+                )
+            else:
+                messagebox.showinfo(
+                    "Başarılı",
+                    f"Form {status} olarak kaydedildi!\n\nForm No: {self.form_no}\nDosya: {filename}"
+                )
+                self.show_main_menu()
 
         except Exception as e:
             messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
@@ -1344,40 +1351,42 @@ class GorevFormuApp:
             )
             btn_geri.pack(side='left', padx=15)
 
-        if self.mode == 'new' and self.current_step >= 4:
-            # Yeni form modunda Görev Yeri'nden sonra kaydet
-            btn_kaydet = tk.Button(
-                center_frame,
-                text="💾 Kaydet",
-                font=('Arial', 13, 'bold'),
-                bg='#4caf50',
-                fg='white',
-                width=15,
-                height=2,
-                command=lambda: self.next_step(save_partial=True),
-                cursor='hand2',
-                relief='raised',
-                bd=3
-            )
-            btn_kaydet.pack(side='left', padx=15)
-        else:
-            # Normal ilerleme
-            btn_ileri = tk.Button(
-                center_frame,
-                text="İleri →",
-                font=('Arial', 13, 'bold'),
-                bg='#2196f3',
-                fg='white',
-                width=15,
-                height=2,
-                command=self.next_step,
-                cursor='hand2',
-                relief='raised',
-                bd=3
-            )
-            btn_ileri.pack(side='left', padx=15)
+        btn_kaydet = tk.Button(
+            center_frame,
+            text="💾 Kaydet",
+            font=('Arial', 13, 'bold'),
+            bg='#4caf50',
+            fg='white',
+            width=15,
+            height=2,
+            command=self.handle_save_button,
+            cursor='hand2',
+            relief='raised',
+            bd=3
+        )
+        btn_kaydet.pack(side='left', padx=15)
+
+        btn_ileri = tk.Button(
+            center_frame,
+            text="İleri →",
+            font=('Arial', 13, 'bold'),
+            bg='#2196f3',
+            fg='white',
+            width=15,
+            height=2,
+            command=self.next_step,
+            cursor='hand2',
+            relief='raised',
+            bd=3
+        )
+        btn_ileri.pack(side='left', padx=15)
 
         self.nav_frame = btn_frame
+
+    def handle_save_button(self):
+        """Kaydet butonu davranışı"""
+        self.collect_form_data()
+        self.save_form(stay_on_step=True)
 
     def next_step(self, save_partial=False):
         """Sonraki adım"""
@@ -1393,11 +1402,6 @@ class GorevFormuApp:
     def previous_step(self):
         """Önceki adım"""
         self.collect_form_data()
-
-        if self.mode == 'edit' and self.current_step == 5:
-            # Edit modunda geri dönmeye izin verme
-            messagebox.showwarning("Uyarı", "Önceki adımlara dönüş yapılamaz!")
-            return
 
         self.current_step -= 1
         self.show_step()
