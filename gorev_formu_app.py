@@ -219,36 +219,91 @@ class GorevFormuApp:
             wb = openpyxl.load_workbook(filename)
             ws = wb.active
 
-            # Basit okuma - gerçek implementasyon daha detaylı mapping gerektirir
+            # Excel'deki tüm anahtar-değer çiftlerini oku
+            raw_data = {}
+            for key_cell, value_cell in ws.iter_rows(min_row=2, max_col=2, values_only=True):
+                if key_cell:
+                    raw_data[str(key_cell).strip()] = value_cell
+
+            def parse_datetime_cell(value):
+                """dd.mm.yyyy HH:MM formatındaki metni tarihe ve saate ayır."""
+                tarih, saat = '', ''
+                if isinstance(value, datetime):
+                    tarih = value.strftime('%d.%m.%Y')
+                    saat = value.strftime('%H:%M')
+                elif isinstance(value, str):
+                    cleaned = value.strip()
+                    if cleaned:
+                        parts = cleaned.split()
+                        if len(parts) >= 2:
+                            tarih = parts[0]
+                            saat = parts[1]
+                        elif ':' in cleaned:
+                            saat = cleaned
+                        else:
+                            tarih = cleaned
+                return tarih, saat
+
+            def clean_mola_value(value):
+                if isinstance(value, (int, float)):
+                    return str(int(value))
+                if isinstance(value, str):
+                    return value.replace('dakika', '').strip()
+                return ''
+
             self.form_data = {
                 'form_no': form_no,
-                'tarih': ws['B2'].value,
-                'dok_no': ws['B3'].value,
-                'rev_no': ws['B4'].value,
+                'tarih': raw_data.get('Tarih', ''),
+                'dok_no': raw_data.get('DOK.NO', ''),
+                'rev_no': raw_data.get('REV.NO/TRH', ''),
+                'avans': raw_data.get('Avans Tutarı', '') or '',
+                'taseron': raw_data.get('Taşeron Şirket', '') or '',
+                'gorev_tanimi': raw_data.get('Görevin Tanımı', '') or '',
+                'gorev_yeri': raw_data.get('Görev Yeri', '') or '',
+                'arac_plaka': raw_data.get('Araç Plaka No', '') or '',
+                'hazirlayan': raw_data.get('Hazırlayan', '') or raw_data.get('Hazırlayan / Görevlendiren', '') or '',
             }
 
-            # Görevli personel oku
-            for i in range(5):
-                cell_value = ws[f'B{6+i}'].value
-                if cell_value:
-                    self.form_data[f'personel_{i+1}'] = cell_value
+            for i in range(1, 6):
+                key = f'Personel {i}'
+                value = raw_data.get(key, '')
+                if value:
+                    self.form_data[f'personel_{i}'] = value
 
-            # Diğer alanları oku
-            row = 12
-            if ws[f'A{row}'].value == "Avans Tutarı":
-                self.form_data['avans'] = ws[f'B{row}'].value or ''
-            row += 1
-            if ws[f'A{row}'].value == "Taşeron Şirket":
-                self.form_data['taseron'] = ws[f'B{row}'].value or ''
-            row += 1
-            if ws[f'A{row}'].value == "Görevin Tanımı":
-                self.form_data['gorev_tanimi'] = ws[f'B{row}'].value or ''
-            row += 1
-            if ws[f'A{row}'].value == "Görev Yeri":
-                self.form_data['gorev_yeri'] = ws[f'B{row}'].value or ''
+            # Tarih-saat alanlarını işle
+            yola_tarih, yola_saat = parse_datetime_cell(raw_data.get('Yola Çıkış'))
+            donus_tarih, donus_saat = parse_datetime_cell(raw_data.get('Dönüş'))
+            calisma_baslangic_tarih, calisma_baslangic_saat = parse_datetime_cell(raw_data.get('Çalışma Başlangıç'))
+            calisma_bitis_tarih, calisma_bitis_saat = parse_datetime_cell(raw_data.get('Çalışma Bitiş'))
 
-            # Saat bilgileri boş
-            self.current_step = 5  # Saat bilgileri adımından başla
+            if yola_tarih:
+                self.form_data['yola_cikis_tarih'] = yola_tarih
+            if yola_saat:
+                self.form_data['yola_cikis_saat'] = yola_saat
+            if donus_tarih:
+                self.form_data['donus_tarih'] = donus_tarih
+            if donus_saat:
+                self.form_data['donus_saat'] = donus_saat
+            if calisma_baslangic_tarih:
+                self.form_data['calisma_baslangic_tarih'] = calisma_baslangic_tarih
+            if calisma_baslangic_saat:
+                self.form_data['calisma_baslangic_saat'] = calisma_baslangic_saat
+            if calisma_bitis_tarih:
+                self.form_data['calisma_bitis_tarih'] = calisma_bitis_tarih
+            if calisma_bitis_saat:
+                self.form_data['calisma_bitis_saat'] = calisma_bitis_saat
+
+            mola_value = clean_mola_value(raw_data.get('Toplam Mola'))
+            if mola_value:
+                self.form_data['mola_suresi'] = mola_value
+
+            durum = (raw_data.get('DURUM') or '').strip().upper()
+
+            if durum == 'TAMAMLANDI':
+                self.current_step = 8  # Özet ekranını göster
+            else:
+                self.current_step = 5  # Saat bilgileri adımından başla
+
             self.show_step()
 
         except Exception as e:
