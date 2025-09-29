@@ -81,6 +81,13 @@ class GorevFormuApp:
         if self.nav_frame is not None and self.nav_frame.winfo_exists():
             self.nav_frame.destroy()
         self.nav_frame = None
+        # Mouse wheel binding'leri temizle
+        try:
+            self.root.unbind_all("<MouseWheel>")
+            self.root.unbind_all("<Button-4>")
+            self.root.unbind_all("<Button-5>")
+        except Exception:
+            pass
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
@@ -485,6 +492,9 @@ class GorevFormuApp:
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
+        def _on_mousewheel_step5(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
         scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
@@ -492,6 +502,9 @@ class GorevFormuApp:
 
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind_all("<MouseWheel>", _on_mousewheel_step5)
+        canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
+        canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
 
         form_frame = tk.Frame(scrollable_frame, bg='white')
         form_frame.pack(pady=10, padx=20, fill='both', expand=True)
@@ -724,6 +737,10 @@ class GorevFormuApp:
 
     def show_summary(self):
         """Özet ekranı"""
+        # Eski mouse wheel binding'leri temizle
+        self.root.unbind_all("<MouseWheel>")
+        self.root.unbind_all("<Button-4>")
+        self.root.unbind_all("<Button-5>")
         # Önce tüm verileri topla
         self.collect_form_data()
         status = self.determine_form_status()
@@ -742,6 +759,9 @@ class GorevFormuApp:
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
         scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
@@ -749,6 +769,9 @@ class GorevFormuApp:
 
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
+        canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
 
         # Özet içeriği
         summary_frame = tk.Frame(scrollable_frame, bg='#f0f4f7', padx=25, pady=25)
