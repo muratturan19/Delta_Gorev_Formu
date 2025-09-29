@@ -17,14 +17,129 @@ class GorevFormuApp:
         
         # Form verileri
         self.form_data = {}
-        self.current_step = 0
-        self.form_no = self.get_next_form_no()
+        self.current_step = None
+        self.form_no = None
+        self.mode = None  # 'create' or 'continue'
+        self.data_dir = 'form_kayitlari'
+        self.partial_file_path = None
         
         # Ana frame
         self.main_frame = tk.Frame(root, bg='white', padx=30, pady=30)
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
-        
-        # İlk adımı göster
+
+        # İlk ekranı göster
+        self.show_main_menu()
+
+    def ensure_data_dir(self):
+        """Form kayıtları klasörünü oluştur"""
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+
+    def show_main_menu(self):
+        """Ana menü ekranını göster"""
+        self.mode = None
+        self.current_step = None
+        self.form_data = {}
+        self.form_no = None
+        self.partial_file_path = None
+        self.clear_frame()
+
+        tk.Label(self.main_frame, text="DELTA PROJE", font=('Arial', 26, 'bold'),
+                 bg='white', fg='#d32f2f').pack(pady=(40, 10))
+        tk.Label(self.main_frame, text="Görev Formu Yönetimi", font=('Arial', 16),
+                 bg='white').pack(pady=(0, 30))
+
+        btn_frame = tk.Frame(self.main_frame, bg='white')
+        btn_frame.pack(pady=20)
+
+        tk.Button(btn_frame, text="Görev Formu Oluştur", font=('Arial', 14, 'bold'),
+                  command=self.start_new_form, bg='#4caf50', fg='white',
+                  width=22, height=2).pack(pady=10)
+
+        tk.Button(btn_frame, text="Görev Formu Çağır", font=('Arial', 14, 'bold'),
+                  command=self.open_form_selection, bg='#2196f3', fg='white',
+                  width=22, height=2).pack(pady=10)
+
+    def start_new_form(self):
+        """Yeni form oluşturma sürecini başlat"""
+        self.mode = 'create'
+        self.ensure_data_dir()
+        self.form_no = self.get_next_form_no()
+        self.form_data = {
+            'form_no': self.form_no,
+            'tarih': datetime.now().strftime('%d.%m.%Y')
+        }
+        self.partial_file_path = os.path.join(self.data_dir, f"{self.form_no}.json")
+        self.current_step = 0
+        self.show_step()
+
+    def open_form_selection(self):
+        """Kayıtlı formları listeler ve seçim yapılmasını sağlar"""
+        self.ensure_data_dir()
+        forms_info = []
+        for file_name in os.listdir(self.data_dir):
+            if file_name.endswith('.json'):
+                full_path = os.path.join(self.data_dir, file_name)
+                try:
+                    with open(full_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    forms_info.append({
+                        'form_no': data.get('form_no', file_name.replace('.json', '')),
+                        'tarih': data.get('tarih', ''),
+                        'path': full_path
+                    })
+                except Exception:
+                    continue
+
+        if not forms_info:
+            messagebox.showinfo("Bilgi", "Kayıtlı bir görev formu bulunamadı.")
+            return
+
+        selection_window = tk.Toplevel(self.root)
+        selection_window.title("Görev Formu Seç")
+        selection_window.geometry("350x300")
+        selection_window.configure(bg='white')
+
+        tk.Label(selection_window, text="Kaydedilmiş Görev Formları",
+                 font=('Arial', 14, 'bold'), bg='white').pack(pady=10)
+
+        listbox = tk.Listbox(selection_window, font=('Arial', 12), height=10)
+        listbox.pack(fill='both', expand=True, padx=20, pady=10)
+
+        sorted_forms = sorted(forms_info, key=lambda x: x['form_no'])
+        for info in sorted_forms:
+            display_text = f"Form {info['form_no']} - Tarih: {info['tarih']}"
+            listbox.insert('end', display_text)
+
+        def load_selected_form(event=None):
+            selection = listbox.curselection()
+            if not selection:
+                messagebox.showwarning("Uyarı", "Lütfen bir form seçiniz.")
+                return
+            index = selection[0]
+            selected_info = sorted_forms[index]
+            selection_window.destroy()
+            self.load_existing_form(selected_info['path'])
+
+        tk.Button(selection_window, text="Seçilen Formu Aç", font=('Arial', 12, 'bold'),
+                  command=load_selected_form, bg='#2196f3', fg='white').pack(pady=10)
+
+        listbox.bind('<Double-Button-1>', load_selected_form)
+
+    def load_existing_form(self, file_path):
+        """Kaydedilmiş formu yükle"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Hata", f"Form yüklenemedi: {str(e)}")
+            return
+
+        self.mode = 'continue'
+        self.form_data = data
+        self.form_no = data.get('form_no')
+        self.partial_file_path = file_path
+        self.current_step = 5
         self.show_step()
     
     def get_next_form_no(self):
@@ -52,7 +167,10 @@ class GorevFormuApp:
     def show_step(self):
         """Mevcut adımı göster"""
         self.clear_frame()
-        
+
+        if self.current_step is None:
+            return
+
         if self.current_step == 0:
             self.step_0_form_bilgileri()
         elif self.current_step == 1:
@@ -80,10 +198,13 @@ class GorevFormuApp:
         info_frame = tk.Frame(self.main_frame, bg='#fff9c4', relief='solid', borderwidth=2)
         info_frame.pack(pady=20, padx=50, fill='x')
         
+        if 'tarih' not in self.form_data:
+            self.form_data['tarih'] = datetime.now().strftime('%d.%m.%Y')
+
         tk.Label(info_frame, text=f"FORM NO: {self.form_no}", font=('Arial', 16, 'bold'),
                 bg='#fff9c4', fg='#d32f2f').pack(pady=10)
-        
-        tk.Label(info_frame, text=f"TARİH: {datetime.now().strftime('%d.%m.%Y')}", 
+
+        tk.Label(info_frame, text=f"TARİH: {self.form_data.get('tarih', '')}",
                 font=('Arial', 12), bg='#fff9c4').pack(pady=5)
         
         tk.Label(info_frame, text="DOK.NO: F-001", font=('Arial', 12), 
@@ -91,9 +212,6 @@ class GorevFormuApp:
         
         tk.Label(info_frame, text="REV.NO/TRH: 00 / 06.05.24", font=('Arial', 12),
                 bg='#fff9c4').pack(pady=5)
-        
-        self.form_data['form_no'] = self.form_no
-        self.form_data['tarih'] = datetime.now().strftime('%d.%m.%Y')
         
         self.add_navigation_buttons()
     
@@ -111,18 +229,22 @@ class GorevFormuApp:
         self.personel_vars = []
         personel_frame = tk.Frame(self.main_frame, bg='white')
         personel_frame.pack(pady=20)
-        
+
+        existing_personeller = self.form_data.get('personel_listesi', [])
+
         for i in range(5):
             frame = tk.Frame(personel_frame, bg='#ffeb3b', pady=5, padx=10)
             frame.pack(fill='x', pady=5)
-            
+
             tk.Label(frame, text=f"Personel {i+1}:", font=('Arial', 11),
                     bg='#ffeb3b').pack(side='left', padx=5)
-            
+
             var = tk.StringVar()
             combo = ttk.Combobox(frame, textvariable=var, values=personel_listesi,
                                 width=30, state='readonly')
             combo.pack(side='left', padx=5)
+            if i < len(existing_personeller):
+                var.set(existing_personeller[i])
             self.personel_vars.append(var)
         
         self.add_navigation_buttons()
@@ -140,6 +262,8 @@ class GorevFormuApp:
                 bg='#4dd0e1').pack()
         self.avans_entry = tk.Entry(avans_frame, font=('Arial', 12), width=30)
         self.avans_entry.pack(pady=5)
+        if self.form_data.get('avans_tutari'):
+            self.avans_entry.insert(0, self.form_data.get('avans_tutari'))
         
         # Taşeron şirket
         taseron_frame = tk.Frame(self.main_frame, bg='#ffeb3b', pady=15, padx=20)
@@ -153,6 +277,8 @@ class GorevFormuApp:
         taseron_combo = ttk.Combobox(taseron_frame, textvariable=self.taseron_var,
                                      values=sirket_listesi, width=30)
         taseron_combo.pack(pady=5)
+        if self.form_data.get('taseron_sirket'):
+            self.taseron_var.set(self.form_data.get('taseron_sirket'))
         
         self.add_navigation_buttons()
     
@@ -164,9 +290,11 @@ class GorevFormuApp:
         text_frame = tk.Frame(self.main_frame, bg='#ffeb3b', pady=15, padx=20)
         text_frame.pack(fill='both', expand=True, pady=10, padx=50)
         
-        self.gorev_tanimi_text = tk.Text(text_frame, font=('Arial', 11), 
+        self.gorev_tanimi_text = tk.Text(text_frame, font=('Arial', 11),
                                          height=15, wrap='word')
         self.gorev_tanimi_text.pack(fill='both', expand=True, pady=5)
+        if self.form_data.get('gorev_tanimi'):
+            self.gorev_tanimi_text.insert('1.0', self.form_data.get('gorev_tanimi'))
         
         self.add_navigation_buttons()
     
@@ -181,6 +309,8 @@ class GorevFormuApp:
         self.gorev_yeri_text = tk.Text(text_frame, font=('Arial', 11),
                                        height=15, wrap='word')
         self.gorev_yeri_text.pack(fill='both', expand=True, pady=5)
+        if self.form_data.get('gorev_yeri'):
+            self.gorev_yeri_text.insert('1.0', self.form_data.get('gorev_yeri'))
         
         self.add_navigation_buttons()
     
@@ -196,10 +326,10 @@ class GorevFormuApp:
                 bg='#ffeb3b').pack()
         self.yola_cikis_tarih = tk.Entry(frame1, font=('Arial', 10), width=15)
         self.yola_cikis_tarih.pack(side='left', padx=5)
-        self.yola_cikis_tarih.insert(0, datetime.now().strftime('%d.%m.%Y'))
+        self.yola_cikis_tarih.insert(0, self.form_data.get('yola_cikis_tarih', ''))
         self.yola_cikis_saat = tk.Entry(frame1, font=('Arial', 10), width=10)
         self.yola_cikis_saat.pack(side='left', padx=5)
-        self.yola_cikis_saat.insert(0, "08:00")
+        self.yola_cikis_saat.insert(0, self.form_data.get('yola_cikis_saat', ''))
         
         # Dönüş
         frame2 = tk.Frame(self.main_frame, bg='#ffeb3b', pady=10, padx=15)
@@ -208,10 +338,10 @@ class GorevFormuApp:
                 bg='#ffeb3b').pack()
         self.donus_tarih = tk.Entry(frame2, font=('Arial', 10), width=15)
         self.donus_tarih.pack(side='left', padx=5)
-        self.donus_tarih.insert(0, datetime.now().strftime('%d.%m.%Y'))
+        self.donus_tarih.insert(0, self.form_data.get('donus_tarih', ''))
         self.donus_saat = tk.Entry(frame2, font=('Arial', 10), width=10)
         self.donus_saat.pack(side='left', padx=5)
-        self.donus_saat.insert(0, "17:00")
+        self.donus_saat.insert(0, self.form_data.get('donus_saat', ''))
         
         # Çalışma başlangıç
         frame3 = tk.Frame(self.main_frame, bg='#ffeb3b', pady=10, padx=15)
@@ -220,10 +350,10 @@ class GorevFormuApp:
                 font=('Arial', 11, 'bold'), bg='#ffeb3b').pack()
         self.calisma_baslangic_tarih = tk.Entry(frame3, font=('Arial', 10), width=15)
         self.calisma_baslangic_tarih.pack(side='left', padx=5)
-        self.calisma_baslangic_tarih.insert(0, datetime.now().strftime('%d.%m.%Y'))
+        self.calisma_baslangic_tarih.insert(0, self.form_data.get('calisma_baslangic_tarih', ''))
         self.calisma_baslangic_saat = tk.Entry(frame3, font=('Arial', 10), width=10)
         self.calisma_baslangic_saat.pack(side='left', padx=5)
-        self.calisma_baslangic_saat.insert(0, "09:00")
+        self.calisma_baslangic_saat.insert(0, self.form_data.get('calisma_baslangic_saat', ''))
         
         # Çalışma bitiş
         frame4 = tk.Frame(self.main_frame, bg='#ffeb3b', pady=10, padx=15)
@@ -232,10 +362,10 @@ class GorevFormuApp:
                 font=('Arial', 11, 'bold'), bg='#ffeb3b').pack()
         self.calisma_bitis_tarih = tk.Entry(frame4, font=('Arial', 10), width=15)
         self.calisma_bitis_tarih.pack(side='left', padx=5)
-        self.calisma_bitis_tarih.insert(0, datetime.now().strftime('%d.%m.%Y'))
+        self.calisma_bitis_tarih.insert(0, self.form_data.get('calisma_bitis_tarih', ''))
         self.calisma_bitis_saat = tk.Entry(frame4, font=('Arial', 10), width=10)
         self.calisma_bitis_saat.pack(side='left', padx=5)
-        self.calisma_bitis_saat.insert(0, "16:00")
+        self.calisma_bitis_saat.insert(0, self.form_data.get('calisma_bitis_saat', ''))
         
         # Mola süresi
         frame5 = tk.Frame(self.main_frame, bg='#ffeb3b', pady=10, padx=15)
@@ -244,7 +374,7 @@ class GorevFormuApp:
                 font=('Arial', 11, 'bold'), bg='#ffeb3b').pack()
         self.mola_suresi = tk.Entry(frame5, font=('Arial', 10), width=10)
         self.mola_suresi.pack(padx=5)
-        self.mola_suresi.insert(0, "60")
+        self.mola_suresi.insert(0, self.form_data.get('mola_suresi', ''))
         
         self.add_navigation_buttons()
     
@@ -261,6 +391,8 @@ class GorevFormuApp:
         arac_combo = ttk.Combobox(arac_frame, textvariable=self.arac_var,
                                  values=plaka_listesi, width=30, state='readonly')
         arac_combo.pack(pady=10)
+        if self.form_data.get('arac_plaka'):
+            self.arac_var.set(self.form_data.get('arac_plaka'))
         
         self.add_navigation_buttons()
     
@@ -280,6 +412,8 @@ class GorevFormuApp:
         hazir_combo = ttk.Combobox(hazir_frame, textvariable=self.hazirlayan_var,
                                    values=personel_listesi, width=30, state='readonly')
         hazir_combo.pack(pady=10)
+        if self.form_data.get('hazirlayan'):
+            self.hazirlayan_var.set(self.form_data.get('hazirlayan'))
         
         self.add_navigation_buttons()
     
@@ -702,29 +836,59 @@ class GorevFormuApp:
         """Navigasyon butonları ekle"""
         btn_frame = tk.Frame(self.main_frame, bg='white')
         btn_frame.pack(side='bottom', pady=20)
-        
-        if self.current_step > 0:
+
+        if self.current_step is not None and self.current_step > 0:
             tk.Button(btn_frame, text="◀ Geri", font=('Arial', 12),
                      command=self.prev_step, bg='#e0e0e0', width=10).pack(side='left', padx=10)
-        
-        tk.Button(btn_frame, text="İleri ▶", font=('Arial', 12, 'bold'),
-                 command=self.next_step, bg='#2196f3', fg='white', 
-                 width=10).pack(side='left', padx=10)
-    
+
+        if self.mode == 'create' and self.current_step == 4:
+            tk.Button(btn_frame, text="💾 Kaydet", font=('Arial', 12, 'bold'),
+                     command=self.save_partial_form, bg='#4caf50', fg='white',
+                     width=12).pack(side='left', padx=10)
+        else:
+            tk.Button(btn_frame, text="İleri ▶", font=('Arial', 12, 'bold'),
+                     command=self.next_step, bg='#2196f3', fg='white',
+                     width=10).pack(side='left', padx=10)
+
+        tk.Button(btn_frame, text="Ana Menü", font=('Arial', 12),
+                 command=self.show_main_menu, bg='#f5f5f5', width=10).pack(side='left', padx=10)
+
     def next_step(self):
         """Bir sonraki adıma geç"""
-        # Mevcut adımın verilerini kaydet
-        if self.current_step == 1:
+        if self.current_step is None:
+            return
+
+        self.collect_step_data(self.current_step)
+
+        if self.mode == 'create' and self.current_step >= 4:
+            return
+
+        self.current_step += 1
+        self.show_step()
+
+    def prev_step(self):
+        """Bir önceki adıma dön"""
+        if self.current_step is not None and self.current_step > 0:
+            self.current_step -= 1
+            self.show_step()
+
+    def collect_step_data(self, step_index):
+        """Mevcut adımın verilerini sözlüğe aktar"""
+        if step_index == 0:
+            self.form_data['form_no'] = self.form_no
+            if 'tarih' not in self.form_data:
+                self.form_data['tarih'] = datetime.now().strftime('%d.%m.%Y')
+        elif step_index == 1:
             personel_listesi = [var.get() for var in self.personel_vars if var.get()]
             self.form_data['personel_listesi'] = personel_listesi
-        elif self.current_step == 2:
+        elif step_index == 2:
             self.form_data['avans_tutari'] = self.avans_entry.get()
             self.form_data['taseron_sirket'] = self.taseron_var.get()
-        elif self.current_step == 3:
+        elif step_index == 3:
             self.form_data['gorev_tanimi'] = self.gorev_tanimi_text.get("1.0", "end-1c")
-        elif self.current_step == 4:
+        elif step_index == 4:
             self.form_data['gorev_yeri'] = self.gorev_yeri_text.get("1.0", "end-1c")
-        elif self.current_step == 5:
+        elif step_index == 5:
             self.form_data['yola_cikis_tarih'] = self.yola_cikis_tarih.get()
             self.form_data['yola_cikis_saat'] = self.yola_cikis_saat.get()
             self.form_data['donus_tarih'] = self.donus_tarih.get()
@@ -734,19 +898,31 @@ class GorevFormuApp:
             self.form_data['calisma_bitis_tarih'] = self.calisma_bitis_tarih.get()
             self.form_data['calisma_bitis_saat'] = self.calisma_bitis_saat.get()
             self.form_data['mola_suresi'] = self.mola_suresi.get()
-        elif self.current_step == 6:
+        elif step_index == 6:
             self.form_data['arac_plaka'] = self.arac_var.get()
-        elif self.current_step == 7:
+        elif step_index == 7:
             self.form_data['hazirlayan'] = self.hazirlayan_var.get()
-        
-        self.current_step += 1
-        self.show_step()
-    
-    def prev_step(self):
-        """Bir önceki adıma dön"""
-        if self.current_step > 0:
-            self.current_step -= 1
-            self.show_step()
+
+    def save_partial_form(self):
+        """Görev formunun ilk bölümlerini kaydet"""
+        if self.current_step != 4:
+            return
+
+        self.collect_step_data(self.current_step)
+        self.ensure_data_dir()
+
+        self.form_data['kaydedilme_zamani'] = datetime.now().strftime('%d.%m.%Y %H:%M')
+
+        try:
+            with open(self.partial_file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.form_data, f, ensure_ascii=False, indent=2)
+            messagebox.showinfo(
+                "Başarılı",
+                f"Form {self.form_no} kaydedildi. Görev tamamlandığında formu çağırarak devam edebilirsiniz."
+            )
+            self.show_main_menu()
+        except Exception as e:
+            messagebox.showerror("Hata", f"Form kaydedilemedi: {str(e)}")
     
     def save_to_excel(self):
         """Excel'e kaydet"""
@@ -860,19 +1036,14 @@ class GorevFormuApp:
             wb.save(filename)
             
             messagebox.showinfo("Başarılı", f"Form başarıyla kaydedildi!\n\nDosya: {filename}")
-            
-            # Yeni form için sıfırla
-            self.reset_form()
-            
+
+            if self.partial_file_path and os.path.exists(self.partial_file_path):
+                os.remove(self.partial_file_path)
+
+            self.show_main_menu()
+
         except Exception as e:
             messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
-    
-    def reset_form(self):
-        """Formu sıfırla ve yeni form için hazırla"""
-        self.form_data = {}
-        self.current_step = 0
-        self.form_no = self.get_next_form_no()
-        self.show_step()
 
 
 if __name__ == "__main__":
