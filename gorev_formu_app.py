@@ -152,24 +152,42 @@ class GorevFormuApp:
         # Açıklama
         info = tk.Label(
             self.main_frame,
-            text="Tamamlanacak formun numarasını girin:",
+            text="Tamamlanacak form numarasını seçin veya girin:",
             font=('Arial', 12),
             bg='white'
         )
         info.pack(pady=10)
 
-        # Form numarası girişi
+        # Mevcut formları listele
+        excel_files = glob.glob("gorev_formu_*.xlsx")
+        form_numbers = []
+        for file in excel_files:
+            form_no = file.replace("gorev_formu_", "").replace(".xlsx", "")
+            form_numbers.append(form_no)
+        form_numbers.sort(reverse=True)
+
+        # Form numarası seçimi
         entry_frame = tk.Frame(self.main_frame, bg='white')
         entry_frame.pack(pady=20)
 
         tk.Label(entry_frame, text="Form No:", font=('Arial', 14, 'bold'), bg='white').pack(side='left', padx=10)
 
-        form_no_entry = tk.Entry(entry_frame, font=('Arial', 14), width=15, justify='center')
-        form_no_entry.pack(side='left', padx=10)
-        form_no_entry.focus()
+        combo_state = 'readonly' if form_numbers else 'normal'
+
+        form_no_combo = ttk.Combobox(
+            entry_frame,
+            font=('Arial', 14),
+            width=15,
+            values=form_numbers,
+            state=combo_state
+        )
+        form_no_combo.pack(side='left', padx=10)
+        if form_numbers:
+            form_no_combo.current(0)
+        form_no_combo.focus()
 
         def load_form():
-            form_no = form_no_entry.get().strip().zfill(5)
+            form_no = form_no_combo.get().strip().zfill(5)
             if not form_no:
                 messagebox.showwarning("Uyarı", "Lütfen form numarası girin!")
                 return
@@ -209,7 +227,7 @@ class GorevFormuApp:
         ).pack(side='left', padx=10)
 
         # Enter tuşu ile aç
-        form_no_entry.bind('<Return>', lambda e: load_form())
+        form_no_combo.bind('<Return>', lambda e: load_form())
 
     def load_partial_form(self, form_no):
         """Kısmi dolu formu yükle ve devam et"""
@@ -365,16 +383,12 @@ class GorevFormuApp:
         self.dok_entry = tk.Entry(form_frame, font=('Arial', 12), width=20)
         self.dok_entry.insert(0, self.form_data.get('dok_no', 'F-001'))
         self.dok_entry.grid(row=2, column=1, padx=10, pady=10)
-        if readonly:
-            self.dok_entry.config(state='readonly', bg='#f0f0f0')
 
         # REV.NO/TRH
         tk.Label(form_frame, text="REV.NO/TRH:", font=('Arial', 12, 'bold'), bg='white').grid(row=3, column=0, sticky='w', pady=10)
         self.rev_entry = tk.Entry(form_frame, font=('Arial', 12), width=20)
         self.rev_entry.insert(0, self.form_data.get('rev_no', ''))
         self.rev_entry.grid(row=3, column=1, padx=10, pady=10)
-        if readonly:
-            self.rev_entry.config(state='readonly', bg='#f0f0f0')
 
         self.form_data['tarih'] = tarih_value
 
@@ -409,6 +423,29 @@ class GorevFormuApp:
                 combo.set(self.form_data.get(f'personel_{i+1}', ''))
                 combo.grid(row=i, column=1, padx=10, pady=10)
                 self.personel_combos.append(combo)
+
+        if not readonly and self.personel_combos:
+
+            def check_duplicate_personel(event=None):
+                """Aynı personelin birden fazla seçilmesini engelle"""
+                selected = []
+                for combo in self.personel_combos:
+                    value = combo.get()
+                    if value:
+                        if value in selected:
+                            messagebox.showwarning(
+                                "Uyarı",
+                                f"'{value}' zaten seçilmiş!\nLütfen farklı bir personel seçin."
+                            )
+                            combo.set('')
+                            return
+                        selected.append(value)
+
+            for combo in self.personel_combos:
+                combo.bind('<<ComboboxSelected>>', check_duplicate_personel)
+
+            # Var olan seçimleri doğrula
+            check_duplicate_personel()
 
         self.add_navigation_buttons(readonly)
 
