@@ -1,12 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from datetime import datetime
-import json
-import os
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import glob
 from tkcalendar import DateEntry
+
+from core import form_service
+from core.form_service import FormServiceError
 
 
 class GorevFormuApp:
@@ -31,50 +30,6 @@ class GorevFormuApp:
 
         # Ana menüyü göster
         self.show_main_menu()
-
-    def get_next_form_no(self):
-        """Yeni form numarası al"""
-        config_file = 'form_config.json'
-        if os.path.exists(config_file):
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                last_no = config.get('last_form_no', 0)
-        else:
-            last_no = 0
-
-        next_no = last_no + 1
-
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump({'last_form_no': next_no}, f)
-
-        return str(next_no).zfill(5)
-
-    def get_excel_filename(self, form_no):
-        """Form numarasına göre Excel dosya adı"""
-        return f"gorev_formu_{form_no}.xlsx"
-
-    def load_form_from_excel(self, form_no):
-        """Excel dosyasından formu yükle"""
-        filename = self.get_excel_filename(form_no)
-        if not os.path.exists(filename):
-            return None
-
-        try:
-            wb = openpyxl.load_workbook(filename)
-            ws = wb.active
-
-            # Excel'den veri oku (basitleştirilmiş - gerçek implementasyon daha detaylı olmalı)
-            data = {}
-            for row in range(1, ws.max_row + 1):
-                key = ws[f'A{row}'].value
-                value = ws[f'B{row}'].value
-                if key and value:
-                    data[key] = value
-
-            return data
-        except Exception as e:
-            messagebox.showerror("Hata", f"Form yüklenemedi: {str(e)}")
-            return None
 
     def clear_frame(self):
         """Frame'i temizle"""
@@ -143,7 +98,12 @@ class GorevFormuApp:
         self.mode = 'new'
         self.form_data = {'durum': 'YARIM'}
         self.current_step = 0
-        self.form_no = self.get_next_form_no()
+        try:
+            self.form_no = form_service.get_next_form_no()
+        except FormServiceError as exc:
+            messagebox.showerror("Hata", str(exc))
+            self.show_main_menu()
+            return
         self.is_readonly = False
         self.show_step()
 
@@ -203,15 +163,6 @@ class GorevFormuApp:
             if not form_no:
                 messagebox.showwarning("Uyarı", "Lütfen form numarası girin!")
                 return
-
-            filename = self.get_excel_filename(form_no)
-            if not os.path.exists(filename):
-                messagebox.showerror("Hata", f"Form {form_no} bulunamadı!\n\nDosya: {filename}")
-                return
-
-            # Formu yükle
-            self.mode = 'edit'
-            self.form_no = form_no
             self.load_partial_form(form_no)
 
         # Butonlar
@@ -243,89 +194,18 @@ class GorevFormuApp:
 
     def load_partial_form(self, form_no):
         """Kısmi dolu formu yükle ve devam et"""
-        filename = self.get_excel_filename(form_no)
-
         try:
-            wb = openpyxl.load_workbook(filename)
-            ws = wb.active
-
-            # Excel'deki tüm anahtar-değer çiftlerini oku
-            raw_data = {}
-            for key_cell, value_cell in ws.iter_rows(min_row=2, max_col=2, values_only=True):
-                if key_cell:
-                    raw_data[str(key_cell).strip()] = value_cell
-
-            def parse_datetime_cell(value):
-                """dd.mm.yyyy HH:MM formatındaki metni tarihe ve saate ayır."""
-                tarih, saat = '', ''
-                if isinstance(value, datetime):
-                    tarih = value.strftime('%d.%m.%Y')
-                    saat = value.strftime('%H:%M')
-                elif isinstance(value, str):
-                    cleaned = value.strip()
-                    if cleaned:
-                        parts = cleaned.split()
-                        if len(parts) >= 2:
-                            tarih = parts[0]
-                            saat = parts[1]
-                        elif ':' in cleaned:
-                            saat = cleaned
-                        else:
-                            tarih = cleaned
-                return tarih, saat
-
-            def clean_mola_value(value):
-                if isinstance(value, (int, float)):
-                    return str(int(value))
-                if isinstance(value, str):
-                    return value.replace('dakika', '').strip()
-                return ''
-
-            self.form_data = {
-                'form_no': form_no,
-                'tarih': raw_data.get('Tarih', '') or '',
-                'dok_no': raw_data.get('DOK.NO', '') or '',
-                'rev_no': raw_data.get('REV.NO/TRH', '') or '',
-                'avans': raw_data.get('Avans Tutarı', '') or '',
-                'taseron': raw_data.get('Taşeron Şirket', '') or '',
-                'gorev_tanimi': raw_data.get('Görevin Tanımı', '') or '',
-                'gorev_yeri': raw_data.get('Görev Yeri', '') or '',
-                'arac_plaka': raw_data.get('Araç Plaka No', '') or '',
-                'hazirlayan': raw_data.get('Hazırlayan', '') or raw_data.get('Hazırlayan / Görevlendiren', '') or '',
-            }
-
-            for i in range(1, 6):
-                key = f'Personel {i}'
-                self.form_data[f'personel_{i}'] = raw_data.get(key, '') or ''
-
-            # Tarih-saat alanlarını işle
-            yola_tarih, yola_saat = parse_datetime_cell(raw_data.get('Yola Çıkış'))
-            donus_tarih, donus_saat = parse_datetime_cell(raw_data.get('Dönüş'))
-            calisma_baslangic_tarih, calisma_baslangic_saat = parse_datetime_cell(raw_data.get('Çalışma Başlangıç'))
-            calisma_bitis_tarih, calisma_bitis_saat = parse_datetime_cell(raw_data.get('Çalışma Bitiş'))
-
-            self.form_data['yola_cikis_tarih'] = yola_tarih
-            self.form_data['yola_cikis_saat'] = yola_saat
-            self.form_data['donus_tarih'] = donus_tarih
-            self.form_data['donus_saat'] = donus_saat
-            self.form_data['calisma_baslangic_tarih'] = calisma_baslangic_tarih
-            self.form_data['calisma_baslangic_saat'] = calisma_baslangic_saat
-            self.form_data['calisma_bitis_tarih'] = calisma_bitis_tarih
-            self.form_data['calisma_bitis_saat'] = calisma_bitis_saat
-
-            mola_value = clean_mola_value(raw_data.get('Toplam Mola'))
-            self.form_data['mola_suresi'] = mola_value or ''
-
-            durum = (raw_data.get('DURUM') or '').strip().upper() or 'YARIM'
-            self.form_data['durum'] = durum
-
-            self.current_step = 0
-            self.is_readonly = False
-            self.show_step()
-
-        except Exception as e:
-            messagebox.showerror("Hata", f"Form okunamadı: {str(e)}")
+            self.form_data = form_service.load_form_data(form_no)
+        except FormServiceError as exc:
+            messagebox.showerror("Hata", str(exc))
             self.show_main_menu()
+            return
+
+        self.mode = 'edit'
+        self.form_no = form_no
+        self.current_step = 0
+        self.is_readonly = False
+        self.show_step()
 
     def show_step(self):
         """Adımları göster"""
@@ -743,8 +623,8 @@ class GorevFormuApp:
         self.root.unbind_all("<Button-5>")
         # Önce tüm verileri topla
         self.collect_form_data()
-        status = self.determine_form_status()
-        self.form_data['durum'] = status
+        status = form_service.determine_form_status(self.form_data)
+        self.form_data['durum'] = status.code
 
         tk.Label(
             self.main_frame,
@@ -976,13 +856,13 @@ class GorevFormuApp:
         create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
 
         current_row += 1
-        status_bg = '#4caf50' if status == 'TAMAMLANDI' else '#ff9800'
+        status_bg = '#4caf50' if status.is_complete else '#ff9800'
         status_fg = 'white'
-        status_value_bg = '#c8e6c9' if status == 'TAMAMLANDI' else '#ffe082'
-        status_value_fg = '#1b5e20' if status == 'TAMAMLANDI' else '#bf360c'
+        status_value_bg = '#c8e6c9' if status.is_complete else '#ffe082'
+        status_value_fg = '#1b5e20' if status.is_complete else '#bf360c'
 
         create_cell(current_row, 0, "DURUM", colspan=2, bg=status_bg, fg=status_fg, font=('Arial', 12, 'bold'), anchor='center')
-        create_cell(current_row, 2, status, colspan=4, bg=status_value_bg, fg=status_value_fg, font=('Arial', 12, 'bold'), anchor='center')
+        create_cell(current_row, 2, status.code, colspan=4, bg=status_value_bg, fg=status_value_fg, font=('Arial', 12, 'bold'), anchor='center')
 
         canvas.pack(side="left", fill="both", expand=True, pady=10)
         scrollbar.pack(side="right", fill="y")
@@ -1108,250 +988,46 @@ class GorevFormuApp:
         except Exception as e:
             print(f"Veri toplama hatası: {e}")
 
-    def determine_form_status(self):
-        """Form durumunu belirle"""
-        required_fields = [
-            'yola_cikis_tarih', 'yola_cikis_saat',
-            'calisma_baslangic_tarih', 'calisma_baslangic_saat',
-            'calisma_bitis_tarih', 'calisma_bitis_saat',
-            'donus_tarih', 'donus_saat'
-        ]
-
-        for key in required_fields:
-            value = (self.form_data.get(key) or '').strip()
-            if not value:
-                return 'YARIM'
-
-        return 'TAMAMLANDI'
-
     def save_partial_form(self):
         """Kısmi formu kaydet (Görev Yeri'ne kadar)"""
         self.collect_form_data()
-
-        filename = self.get_excel_filename(self.form_no)
-
         try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Görev Formu"
+            filename, status = form_service.save_partial_form(self.form_no, self.form_data)
+        except FormServiceError as exc:
+            messagebox.showerror("Hata", str(exc))
+            return
 
-            # Stil
-            header_fill = PatternFill(start_color='FFEB3B', end_color='FFEB3B', fill_type='solid')
-            border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
+        self.form_data['durum'] = status.code
 
-            row = 1
+        messagebox.showinfo(
+            "Başarılı",
+            f"Form oluşturuldu!\n\nForm No: {self.form_no}\nDosya: {filename}\n\nGörev tamamlandığında 'GÖREV FORMU ÇAĞIR' ile bu formu açıp kalan kısımları doldurun."
+        )
 
-            # Başlık
-            ws[f'A{row}'] = "DELTA PROJE - GÖREV FORMU"
-            ws[f'A{row}'].font = Font(size=16, bold=True, color='D32F2F')
-            ws.merge_cells(f'A{row}:B{row}')
-            row += 1
-
-            # Form bilgileri
-            ws[f'A{row}'] = "Form No"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_no
-            row += 1
-
-            ws[f'A{row}'] = "Tarih"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('tarih', '')
-            row += 1
-
-            ws[f'A{row}'] = "DOK.NO"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('dok_no', '')
-            row += 1
-
-            ws[f'A{row}'] = "REV.NO/TRH"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('rev_no', '')
-            row += 1
-
-            # Personel
-            ws[f'A{row}'] = "Görevli Personel"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            row += 1
-
-            for i in range(5):
-                ws[f'A{row}'] = f"Personel {i+1}"
-                ws[f'B{row}'] = self.form_data.get(f'personel_{i+1}', '')
-                row += 1
-
-            # Diğer bilgiler
-            ws[f'A{row}'] = "Avans Tutarı"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('avans', '')
-            row += 1
-
-            ws[f'A{row}'] = "Taşeron Şirket"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('taseron', '')
-            row += 1
-
-            ws[f'A{row}'] = "Görevin Tanımı"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('gorev_tanimi', '')
-            row += 1
-
-            ws[f'A{row}'] = "Görev Yeri"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = header_fill
-            ws[f'B{row}'] = self.form_data.get('gorev_yeri', '')
-            row += 1
-
-            # Durum
-            ws[f'A{row}'] = "DURUM"
-            ws[f'A{row}'].font = Font(bold=True)
-            ws[f'A{row}'].fill = PatternFill(start_color='FF9800', end_color='FF9800', fill_type='solid')
-            ws[f'B{row}'] = "YARIM"
-            ws[f'B{row}'].fill = PatternFill(start_color='FFC107', end_color='FFC107', fill_type='solid')
-
-            # Sütun genişlikleri
-            ws.column_dimensions['A'].width = 25
-            ws.column_dimensions['B'].width = 60
-
-            wb.save(filename)
-
-            self.form_data['durum'] = 'YARIM'
-
-            messagebox.showinfo(
-                "Başarılı",
-                f"Form oluşturuldu!\n\nForm No: {self.form_no}\nDosya: {filename}\n\nGörev tamamlandığında 'GÖREV FORMU ÇAĞIR' ile bu formu açıp kalan kısımları doldurun."
-            )
-
-            self.show_main_menu()
-
-        except Exception as e:
-            messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
+        self.show_main_menu()
 
     def save_form(self, stay_on_step=False):
         """Formu kaydet"""
         self.collect_form_data()
-
-        filename = self.get_excel_filename(self.form_no)
-
-        status = self.determine_form_status()
-        self.form_data['durum'] = status
-
         try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Görev Formu"
+            filename, status = form_service.save_form(self.form_no, self.form_data)
+        except FormServiceError as exc:
+            messagebox.showerror("Hata", str(exc))
+            return
 
-            # Stil
-            header_fill = PatternFill(start_color='FFEB3B', end_color='FFEB3B', fill_type='solid')
-            status_fill = PatternFill(start_color='4CAF50', end_color='4CAF50', fill_type='solid') if status == 'TAMAMLANDI' else PatternFill(start_color='FF9800', end_color='FF9800', fill_type='solid')
-            status_value_fill = PatternFill(start_color='81C784', end_color='81C784', fill_type='solid') if status == 'TAMAMLANDI' else PatternFill(start_color='FFC107', end_color='FFC107', fill_type='solid')
+        self.form_data['durum'] = status.code
 
-            row = 1
-
-            # Başlık
-            ws[f'A{row}'] = "DELTA PROJE - GÖREV FORMU"
-            ws[f'A{row}'].font = Font(size=16, bold=True, color='D32F2F')
-            ws.merge_cells(f'A{row}:B{row}')
-            row += 1
-
-            # Tüm bilgileri yaz
-            data_map = [
-                ("Form No", self.form_no),
-                ("Tarih", self.form_data.get('tarih', '')),
-                ("DOK.NO", self.form_data.get('dok_no', '')),
-                ("REV.NO/TRH", self.form_data.get('rev_no', '')),
-                ("", ""),
-                ("Görevli Personel", ""),
-            ]
-
-            for label, value in data_map:
-                if label:
-                    ws[f'A{row}'] = label
-                    ws[f'A{row}'].font = Font(bold=True)
-                    ws[f'A{row}'].fill = header_fill
-                    ws[f'B{row}'] = value
-                row += 1
-
-            # Personel listesi
-            for i in range(5):
-                ws[f'A{row}'] = f"Personel {i+1}"
-                ws[f'B{row}'] = self.form_data.get(f'personel_{i+1}', '')
-                row += 1
-
-            row += 1
-
-            def format_datetime(date_key, time_key):
-                tarih = (self.form_data.get(date_key) or '').strip()
-                saat = (self.form_data.get(time_key) or '').strip()
-                if tarih and saat:
-                    return f"{tarih} {saat}"
-                return tarih or saat
-
-            mola = (self.form_data.get('mola_suresi') or '').strip()
-            mola_text = f"{mola} dakika" if mola else ''
-
-            # Diğer tüm alanlar
-            all_data = [
-                ("Avans Tutarı", self.form_data.get('avans', '')),
-                ("Taşeron Şirket", self.form_data.get('taseron', '')),
-                ("Görevin Tanımı", self.form_data.get('gorev_tanimi', '')),
-                ("Görev Yeri", self.form_data.get('gorev_yeri', '')),
-                ("", ""),
-                ("Yola Çıkış", format_datetime('yola_cikis_tarih', 'yola_cikis_saat')),
-                ("Dönüş", format_datetime('donus_tarih', 'donus_saat')),
-                ("Çalışma Başlangıç", format_datetime('calisma_baslangic_tarih', 'calisma_baslangic_saat')),
-                ("Çalışma Bitiş", format_datetime('calisma_bitis_tarih', 'calisma_bitis_saat')),
-                ("Toplam Mola", mola_text),
-                ("", ""),
-                ("Araç Plaka No", self.form_data.get('arac_plaka', '')),
-                ("Hazırlayan", self.form_data.get('hazirlayan', '')),
-                ("", ""),
-                ("DURUM", status),
-            ]
-
-            for label, value in all_data:
-                if label:
-                    ws[f'A{row}'] = label
-                    ws[f'A{row}'].font = Font(bold=True)
-                    if label == "DURUM":
-                        ws[f'A{row}'].fill = status_fill
-                        ws[f'B{row}'].fill = status_value_fill
-                    else:
-                        ws[f'A{row}'].fill = header_fill
-                    ws[f'B{row}'] = value
-                row += 1
-
-            # Sütun genişlikleri
-            ws.column_dimensions['A'].width = 25
-            ws.column_dimensions['B'].width = 60
-
-            wb.save(filename)
-
-            if stay_on_step:
-                messagebox.showinfo(
-                    "Kaydedildi",
-                    f"Form {status} olarak kaydedildi.\n\nForm No: {self.form_no}\nDosya: {filename}"
-                )
-            else:
-                messagebox.showinfo(
-                    "Başarılı",
-                    f"Form {status} olarak kaydedildi!\n\nForm No: {self.form_no}\nDosya: {filename}"
-                )
-                self.show_main_menu()
-
-        except Exception as e:
-            messagebox.showerror("Hata", f"Kaydetme hatası: {str(e)}")
+        if stay_on_step:
+            messagebox.showinfo(
+                "Kaydedildi",
+                f"Form {status.code} olarak kaydedildi.\n\nForm No: {self.form_no}\nDosya: {filename}"
+            )
+        else:
+            messagebox.showinfo(
+                "Başarılı",
+                f"Form {status.code} olarak kaydedildi!\n\nForm No: {self.form_no}\nDosya: {filename}"
+            )
+            self.show_main_menu()
 
     def add_navigation_buttons(self, readonly=False, canvas_parent=False):
         """Navigasyon butonları ekle"""
