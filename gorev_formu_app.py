@@ -22,6 +22,7 @@ class GorevFormuApp:
         self.current_step = 0
         self.form_no = None
         self.is_readonly = False
+        self.nav_frame = None
 
         # Ana frame
         self.main_frame = tk.Frame(root, bg='white', padx=30, pady=30)
@@ -76,6 +77,9 @@ class GorevFormuApp:
 
     def clear_frame(self):
         """Frame'i temizle"""
+        if self.nav_frame is not None and self.nav_frame.winfo_exists():
+            self.nav_frame.destroy()
+        self.nav_frame = None
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
@@ -1311,13 +1315,14 @@ class GorevFormuApp:
 
     def add_navigation_buttons(self, readonly=False, canvas_parent=False):
         """Navigasyon butonları ekle"""
-        parent = self.main_frame if not canvas_parent else self.root
+        if self.nav_frame is not None and self.nav_frame.winfo_exists():
+            self.nav_frame.destroy()
+
+        parent = self.main_frame
 
         btn_frame = tk.Frame(parent, bg='white')
-        if canvas_parent:
-            btn_frame.pack(side='bottom', pady=20, fill='x')
-        else:
-            btn_frame.pack(side='bottom', pady=30, fill='x')
+        pady = 20 if canvas_parent else 30
+        btn_frame.pack(side='bottom', pady=pady, fill='x')
 
         # Butonları ortala
         center_frame = tk.Frame(btn_frame, bg='white')
@@ -1371,6 +1376,8 @@ class GorevFormuApp:
                 bd=3
             )
             btn_ileri.pack(side='left', padx=15)
+
+        self.nav_frame = btn_frame
 
     def next_step(self, save_partial=False):
         """Sonraki adım"""
