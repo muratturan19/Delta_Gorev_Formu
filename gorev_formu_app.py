@@ -514,6 +514,9 @@ class GorevFormuApp:
 
     def step_5_saat_bilgileri(self):
         """Adım 5: Saat bilgileri"""
+        saat_list = [f"{i:02d}" for i in range(24)]
+        dakika_list = [f"{i:02d}" for i in range(60)]
+
         tk.Label(self.main_frame, text="🕐 Saat ve Tarih Bilgileri", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
 
         # Scroll frame
@@ -553,19 +556,19 @@ class GorevFormuApp:
         saat_frame1 = tk.Frame(form_frame, bg='white')
         saat_frame1.grid(row=row, column=4, padx=5)
 
-        yola_cikis_saat = ttk.Spinbox(saat_frame1, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
-        yola_cikis_saat.pack(side='left')
+        yola_cikis_saat = ttk.Combobox(saat_frame1, values=saat_list, width=3, state='readonly', font=('Arial', 11))
         yola_cikis_saat.set('00')
+        yola_cikis_saat.pack(side='left')
         tk.Label(saat_frame1, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
-        yola_cikis_dakika = ttk.Spinbox(saat_frame1, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
-        yola_cikis_dakika.pack(side='left')
+        yola_cikis_dakika = ttk.Combobox(saat_frame1, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
         yola_cikis_dakika.set('00')
+        yola_cikis_dakika.pack(side='left')
 
         if self.form_data.get('yola_cikis_saat'):
             try:
                 h, m = self.form_data.get('yola_cikis_saat', '00:00').split(':')
-                yola_cikis_saat.set(int(h))
-                yola_cikis_dakika.set(int(m))
+                yola_cikis_saat.set(h)
+                yola_cikis_dakika.set(m)
             except:
                 pass
 
@@ -589,19 +592,19 @@ class GorevFormuApp:
         saat_frame2 = tk.Frame(form_frame, bg='white')
         saat_frame2.grid(row=row, column=4, padx=5)
 
-        donus_saat = ttk.Spinbox(saat_frame2, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
-        donus_saat.pack(side='left')
+        donus_saat = ttk.Combobox(saat_frame2, values=saat_list, width=3, state='readonly', font=('Arial', 11))
         donus_saat.set('00')
+        donus_saat.pack(side='left')
         tk.Label(saat_frame2, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
-        donus_dakika = ttk.Spinbox(saat_frame2, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
-        donus_dakika.pack(side='left')
+        donus_dakika = ttk.Combobox(saat_frame2, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
         donus_dakika.set('00')
+        donus_dakika.pack(side='left')
 
         if self.form_data.get('donus_saat'):
             try:
                 h, m = self.form_data.get('donus_saat', '00:00').split(':')
-                donus_saat.set(int(h))
-                donus_dakika.set(int(m))
+                donus_saat.set(h)
+                donus_dakika.set(m)
             except:
                 pass
 
@@ -625,19 +628,19 @@ class GorevFormuApp:
         saat_frame3 = tk.Frame(form_frame, bg='white')
         saat_frame3.grid(row=row, column=4, padx=5)
 
-        calisma_baslangic_saat = ttk.Spinbox(saat_frame3, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
-        calisma_baslangic_saat.pack(side='left')
+        calisma_baslangic_saat = ttk.Combobox(saat_frame3, values=saat_list, width=3, state='readonly', font=('Arial', 11))
         calisma_baslangic_saat.set('00')
+        calisma_baslangic_saat.pack(side='left')
         tk.Label(saat_frame3, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
-        calisma_baslangic_dakika = ttk.Spinbox(saat_frame3, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
-        calisma_baslangic_dakika.pack(side='left')
+        calisma_baslangic_dakika = ttk.Combobox(saat_frame3, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
         calisma_baslangic_dakika.set('00')
+        calisma_baslangic_dakika.pack(side='left')
 
         if self.form_data.get('calisma_baslangic_saat'):
             try:
                 h, m = self.form_data.get('calisma_baslangic_saat', '00:00').split(':')
-                calisma_baslangic_saat.set(int(h))
-                calisma_baslangic_dakika.set(int(m))
+                calisma_baslangic_saat.set(h)
+                calisma_baslangic_dakika.set(m)
             except:
                 pass
 
@@ -661,19 +664,19 @@ class GorevFormuApp:
         saat_frame4 = tk.Frame(form_frame, bg='white')
         saat_frame4.grid(row=row, column=4, padx=5)
 
-        calisma_bitis_saat = ttk.Spinbox(saat_frame4, from_=0, to=23, width=3, format='%02.0f', font=('Arial', 11))
-        calisma_bitis_saat.pack(side='left')
+        calisma_bitis_saat = ttk.Combobox(saat_frame4, values=saat_list, width=3, state='readonly', font=('Arial', 11))
         calisma_bitis_saat.set('00')
+        calisma_bitis_saat.pack(side='left')
         tk.Label(saat_frame4, text=":", bg='white', font=('Arial', 11, 'bold')).pack(side='left')
-        calisma_bitis_dakika = ttk.Spinbox(saat_frame4, from_=0, to=59, width=3, format='%02.0f', font=('Arial', 11))
-        calisma_bitis_dakika.pack(side='left')
+        calisma_bitis_dakika = ttk.Combobox(saat_frame4, values=dakika_list, width=3, state='readonly', font=('Arial', 11))
         calisma_bitis_dakika.set('00')
+        calisma_bitis_dakika.pack(side='left')
 
         if self.form_data.get('calisma_bitis_saat'):
             try:
                 h, m = self.form_data.get('calisma_bitis_saat', '00:00').split(':')
-                calisma_bitis_saat.set(int(h))
-                calisma_bitis_dakika.set(int(m))
+                calisma_bitis_saat.set(h)
+                calisma_bitis_dakika.set(m)
             except:
                 pass
 
@@ -688,17 +691,17 @@ class GorevFormuApp:
 
         # Widget'ları sakla
         self.yola_cikis_tarih_entry = yola_cikis_tarih
-        self.yola_cikis_saat_spin = yola_cikis_saat
-        self.yola_cikis_dakika_spin = yola_cikis_dakika
+        self.yola_cikis_saat_combo = yola_cikis_saat
+        self.yola_cikis_dakika_combo = yola_cikis_dakika
         self.donus_tarih_entry = donus_tarih
-        self.donus_saat_spin = donus_saat
-        self.donus_dakika_spin = donus_dakika
+        self.donus_saat_combo = donus_saat
+        self.donus_dakika_combo = donus_dakika
         self.calisma_baslangic_tarih_entry = calisma_baslangic_tarih
-        self.calisma_baslangic_saat_spin = calisma_baslangic_saat
-        self.calisma_baslangic_dakika_spin = calisma_baslangic_dakika
+        self.calisma_baslangic_saat_combo = calisma_baslangic_saat
+        self.calisma_baslangic_dakika_combo = calisma_baslangic_dakika
         self.calisma_bitis_tarih_entry = calisma_bitis_tarih
-        self.calisma_bitis_saat_spin = calisma_bitis_saat
-        self.calisma_bitis_dakika_spin = calisma_bitis_dakika
+        self.calisma_bitis_saat_combo = calisma_bitis_saat
+        self.calisma_bitis_dakika_combo = calisma_bitis_dakika
         self.mola_suresi_spin = mola_suresi
 
         canvas.pack(side="left", fill="both", expand=True)
@@ -936,23 +939,23 @@ class GorevFormuApp:
             if hasattr(self, 'yola_cikis_tarih_entry'):
                 if self.yola_cikis_tarih_entry.winfo_exists():
                     self.form_data['yola_cikis_tarih'] = self.yola_cikis_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.yola_cikis_saat_spin.get() or 0)
-                    m = int(self.yola_cikis_dakika_spin.get() or 0)
+                    h = int(self.yola_cikis_saat_combo.get() or 0)
+                    m = int(self.yola_cikis_dakika_combo.get() or 0)
                     self.form_data['yola_cikis_saat'] = f"{h:02d}:{m:02d}"
 
                     self.form_data['donus_tarih'] = self.donus_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.donus_saat_spin.get() or 0)
-                    m = int(self.donus_dakika_spin.get() or 0)
+                    h = int(self.donus_saat_combo.get() or 0)
+                    m = int(self.donus_dakika_combo.get() or 0)
                     self.form_data['donus_saat'] = f"{h:02d}:{m:02d}"
 
                     self.form_data['calisma_baslangic_tarih'] = self.calisma_baslangic_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.calisma_baslangic_saat_spin.get() or 0)
-                    m = int(self.calisma_baslangic_dakika_spin.get() or 0)
+                    h = int(self.calisma_baslangic_saat_combo.get() or 0)
+                    m = int(self.calisma_baslangic_dakika_combo.get() or 0)
                     self.form_data['calisma_baslangic_saat'] = f"{h:02d}:{m:02d}"
 
                     self.form_data['calisma_bitis_tarih'] = self.calisma_bitis_tarih_entry.get_date().strftime('%d.%m.%Y')
-                    h = int(self.calisma_bitis_saat_spin.get() or 0)
-                    m = int(self.calisma_bitis_dakika_spin.get() or 0)
+                    h = int(self.calisma_bitis_saat_combo.get() or 0)
+                    m = int(self.calisma_bitis_dakika_combo.get() or 0)
                     self.form_data['calisma_bitis_saat'] = f"{h:02d}:{m:02d}"
 
                     self.form_data['mola_suresi'] = self.mola_suresi_spin.get()
