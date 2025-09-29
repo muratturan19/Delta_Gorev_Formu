@@ -754,10 +754,16 @@ class GorevFormuApp:
         # Önce tüm verileri topla
         self.collect_form_data()
 
-        tk.Label(self.main_frame, text="📊 Form Özeti", font=('Arial', 18, 'bold'), bg='white', fg='#d32f2f').pack(pady=20)
+        tk.Label(
+            self.main_frame,
+            text="📊 Form Özeti",
+            font=('Arial', 18, 'bold'),
+            bg='white',
+            fg='#d32f2f'
+        ).pack(pady=20)
 
         # Ana canvas ve scrollbar
-        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, height=450)
+        canvas = tk.Canvas(self.main_frame, bg='white', highlightthickness=0, height=460)
         scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg='white')
 
@@ -770,80 +776,207 @@ class GorevFormuApp:
         canvas.configure(yscrollcommand=scrollbar.set)
 
         # Özet içeriği
-        summary_frame = tk.Frame(scrollable_frame, bg='white', padx=30, pady=30)
+        summary_frame = tk.Frame(scrollable_frame, bg='#f0f4f7', padx=25, pady=25)
         summary_frame.pack(fill='both', expand=True)
 
-        # Başlık kutusu
-        header_frame = tk.Frame(summary_frame, bg='#d32f2f', padx=15, pady=10)
-        header_frame.pack(fill='x', pady=(0, 10))
-        tk.Label(header_frame, text="DELTA PROJE - GÖREV FORMU",
-                font=('Arial', 14, 'bold'), bg='#d32f2f', fg='white').pack()
+        report_frame = tk.Frame(summary_frame, bg='white', bd=2, relief='solid')
+        report_frame.pack(fill='both', expand=True)
 
-        # Form Bilgileri
-        self.add_summary_section(summary_frame, "📋 FORM BİLGİLERİ", [
-            ("Form No", self.form_no),
-            ("Tarih", self.form_data.get('tarih', '')),
-            ("DOK.NO", self.form_data.get('dok_no', '')),
-            ("REV.NO/TRH", self.form_data.get('rev_no', ''))
-        ])
+        grid_frame = tk.Frame(report_frame, bg='white')
+        grid_frame.pack(fill='both', expand=True, padx=3, pady=3)
 
-        # Görevli Personel
-        personel_list = []
-        for i in range(1, 6):
-            personel = self.form_data.get(f'personel_{i}', '')
-            if personel:
-                personel_list.append((f"Personel {i}", personel))
+        for col in range(6):
+            grid_frame.grid_columnconfigure(col, weight=1, uniform='col')
 
-        if personel_list:
-            self.add_summary_section(summary_frame, "👥 GÖREVLİ PERSONEL", personel_list)
+        def create_cell(row, column, text='', colspan=1, rowspan=1, bg='white', fg='#000',
+                        font=('Arial', 10), anchor='w', padx=8, pady=6, wrap=None,
+                        border=True, justify='left'):
+            label = tk.Label(
+                grid_frame,
+                text=text,
+                bg=bg,
+                fg=fg,
+                font=font,
+                anchor=anchor,
+                justify=justify,
+                padx=padx,
+                pady=pady,
+                wraplength=wrap
+            )
+            if border:
+                label.configure(relief='solid', borderwidth=1)
+            else:
+                label.configure(borderwidth=0)
+            label.grid(row=row, column=column, columnspan=colspan, rowspan=rowspan, sticky='nsew')
+            return label
 
-        # Mali Bilgiler
-        mali_data = []
-        if self.form_data.get('avans'):
-            mali_data.append(("Avans Tutarı", self.form_data.get('avans', '')))
-        if self.form_data.get('taseron'):
-            mali_data.append(("Taşeron Şirket", self.form_data.get('taseron', '')))
+        # Üst başlık
+        create_cell(
+            0,
+            0,
+            text="Delta Proje\nHidrolik & Pnömatik",
+            colspan=2,
+            bg='white',
+            fg='#d32f2f',
+            font=('Arial', 12, 'bold'),
+            anchor='center',
+            justify='center'
+        )
+        create_cell(
+            0,
+            2,
+            text="GÖREV FORMU",
+            colspan=2,
+            bg='#0d47a1',
+            fg='white',
+            font=('Arial', 18, 'bold'),
+            anchor='center'
+        )
+        create_cell(0, 4, "FORM NO", bg='#fff176', font=('Arial', 11, 'bold'), anchor='center')
+        create_cell(0, 5, self.form_no or '-', bg='#bbdefb', font=('Arial', 11, 'bold'), anchor='center')
 
-        if mali_data:
-            self.add_summary_section(summary_frame, "💰 MALİ BİLGİLER", mali_data)
+        tarih = self.form_data.get('tarih', '') or '-'
+        dok_no = self.form_data.get('dok_no', '') or '-'
+        rev_no = self.form_data.get('rev_no', '') or '-'
 
-        # Görev Detayları
-        gorev_data = []
-        if self.form_data.get('gorev_tanimi'):
-            gorev_data.append(("Görevin Tanımı", self.form_data.get('gorev_tanimi', '')))
-        if self.form_data.get('gorev_yeri'):
-            gorev_data.append(("Görev Yeri", self.form_data.get('gorev_yeri', '')))
+        create_cell(1, 4, "TARİH", bg='#fff176', font=('Arial', 11, 'bold'), anchor='center')
+        create_cell(1, 5, tarih, bg='#e3f2fd', font=('Arial', 11), anchor='center')
+        create_cell(2, 4, "DOK.NO", bg='#fff176', font=('Arial', 11, 'bold'), anchor='center')
+        create_cell(2, 5, dok_no, bg='#e3f2fd', font=('Arial', 11), anchor='center')
+        create_cell(3, 4, "REV.NO/TRH", bg='#fff176', font=('Arial', 11, 'bold'), anchor='center')
+        create_cell(3, 5, rev_no, bg='#e3f2fd', font=('Arial', 11), anchor='center')
 
-        if gorev_data:
-            self.add_summary_section(summary_frame, "📝 GÖREV DETAYLARI", gorev_data)
+        for filler_row in range(1, 4):
+            create_cell(filler_row, 0, '', colspan=4, bg='white')
 
-        # Zaman Bilgileri
-        zaman_data = []
-        if self.form_data.get('yola_cikis_tarih'):
-            zaman_data.append(("Yola Çıkış", f"{self.form_data.get('yola_cikis_tarih', '')} {self.form_data.get('yola_cikis_saat', '')}"))
-        if self.form_data.get('donus_tarih'):
-            zaman_data.append(("Dönüş", f"{self.form_data.get('donus_tarih', '')} {self.form_data.get('donus_saat', '')}"))
-        if self.form_data.get('calisma_baslangic_tarih'):
-            zaman_data.append(("Çalışma Başlangıç", f"{self.form_data.get('calisma_baslangic_tarih', '')} {self.form_data.get('calisma_baslangic_saat', '')}"))
-        if self.form_data.get('calisma_bitis_tarih'):
-            zaman_data.append(("Çalışma Bitiş", f"{self.form_data.get('calisma_bitis_tarih', '')} {self.form_data.get('calisma_bitis_saat', '')}"))
-        if self.form_data.get('mola_suresi'):
-            zaman_data.append(("Toplam Mola", f"{self.form_data.get('mola_suresi', '')} dakika"))
+        # Personel ve mali bilgiler
+        current_row = 4
+        create_cell(current_row, 0, "GÖREVLİ PERSONEL", colspan=2, bg='#fff176', font=('Arial', 12, 'bold'))
+        create_cell(current_row, 2, "AVANS TUTARI", colspan=2, bg='#fff176', font=('Arial', 12, 'bold'))
+        create_cell(current_row, 4, "TAŞERON ŞİRKET", colspan=2, bg='#fff176', font=('Arial', 12, 'bold'))
 
-        if zaman_data:
-            self.add_summary_section(summary_frame, "🕐 ZAMAN BİLGİLERİ", zaman_data)
+        personel_values = [self.form_data.get(f'personel_{i}', '') for i in range(1, 6)]
+        avans_value = self.form_data.get('avans', '') or '-'
+        taseron_value = self.form_data.get('taseron', '') or '-'
 
-        # Diğer Bilgiler
-        diger_data = []
-        if self.form_data.get('arac_plaka'):
-            diger_data.append(("Araç Plaka No", self.form_data.get('arac_plaka', '')))
-        if self.form_data.get('hazirlayan'):
-            diger_data.append(("Hazırlayan / Görevlendiren", self.form_data.get('hazirlayan', '')))
+        for index in range(5):
+            row_index = current_row + 1 + index
+            create_cell(row_index, 0, f"Personel {index + 1}", bg='#fffde7', font=('Arial', 10, 'bold'))
+            create_cell(row_index, 1, personel_values[index] or '-', bg='#f5f5f5', font=('Arial', 10))
 
-        if diger_data:
-            self.add_summary_section(summary_frame, "🚗 DİĞER BİLGİLER", diger_data)
+            if index == 0:
+                create_cell(row_index, 2, 'Tutar', bg='#fffde7', font=('Arial', 10, 'bold'))
+                create_cell(row_index, 3, avans_value, bg='#f5f5f5', font=('Arial', 10))
+                create_cell(row_index, 4, 'Şirket', bg='#fffde7', font=('Arial', 10, 'bold'))
+                create_cell(row_index, 5, taseron_value, bg='#f5f5f5', font=('Arial', 10))
+            else:
+                create_cell(row_index, 2, '', bg='white')
+                create_cell(row_index, 3, '', bg='white')
+                create_cell(row_index, 4, '', bg='white')
+                create_cell(row_index, 5, '', bg='white')
 
-        canvas.pack(side="left", fill="both", expand=True, padx=(0, 0))
+        current_row += 6
+        create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
+
+        current_row += 1
+        create_cell(current_row, 0, "GÖREVİN TANIMI", colspan=4, bg='#fff176', font=('Arial', 12, 'bold'))
+        create_cell(current_row, 4, "GÖREV YERİ", colspan=2, bg='#fff176', font=('Arial', 12, 'bold'))
+
+        gorev_tanimi = self.form_data.get('gorev_tanimi', '') or '-'
+        gorev_yeri = self.form_data.get('gorev_yeri', '') or '-'
+
+        current_row += 1
+        create_cell(current_row, 0, gorev_tanimi, colspan=4, bg='#f5f5f5', font=('Arial', 10), wrap=460)
+        create_cell(current_row, 4, gorev_yeri, colspan=2, bg='#f5f5f5', font=('Arial', 10), wrap=220)
+
+        current_row += 1
+        create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
+
+        current_row += 1
+        create_cell(current_row, 0, "SEYAHAT / ÇALIŞMA BİLGİLERİ", colspan=6, bg='#fff176', font=('Arial', 12, 'bold'))
+
+        def pair_row(row, label1, value1, label2='', value2=''):
+            create_cell(row, 0, label1, bg='#fffde7', font=('Arial', 10, 'bold'))
+            create_cell(row, 1, value1 or '-', bg='#f5f5f5', font=('Arial', 10))
+            if label2:
+                create_cell(row, 2, label2, bg='#fffde7', font=('Arial', 10, 'bold'))
+                create_cell(row, 3, value2 or '-', bg='#f5f5f5', font=('Arial', 10))
+            else:
+                create_cell(row, 2, '', bg='white')
+                create_cell(row, 3, '', bg='white')
+            create_cell(row, 4, '', bg='white')
+            create_cell(row, 5, '', bg='white')
+
+        zaman_satirlari = [
+            (
+                "Yola Çıkış Tarihi",
+                self.form_data.get('yola_cikis_tarih', ''),
+                "Yola Çıkış Saati",
+                self.form_data.get('yola_cikis_saat', '')
+            ),
+            (
+                "Dönüş Tarihi",
+                self.form_data.get('donus_tarih', ''),
+                "Dönüş Saati",
+                self.form_data.get('donus_saat', '')
+            ),
+            (
+                "Çalışma Başlangıç",
+                self.form_data.get('calisma_baslangic_tarih', ''),
+                "Başlangıç Saati",
+                self.form_data.get('calisma_baslangic_saat', '')
+            ),
+            (
+                "Çalışma Bitiş",
+                self.form_data.get('calisma_bitis_tarih', ''),
+                "Bitiş Saati",
+                self.form_data.get('calisma_bitis_saat', '')
+            ),
+            (
+                "Toplam Mola",
+                f"{self.form_data.get('mola_suresi', '')} dakika" if self.form_data.get('mola_suresi') else '',
+                '',
+                ''
+            ),
+        ]
+
+        for offset, zaman in enumerate(zaman_satirlari, start=1):
+            pair_row(current_row + offset, *zaman)
+
+        current_row += len(zaman_satirlari) + 1
+        create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
+
+        current_row += 1
+        create_cell(current_row, 0, "ARAÇ PLAKA NO", colspan=3, bg='#fff176', font=('Arial', 12, 'bold'))
+        create_cell(current_row, 3, "", colspan=3, bg='white', border=False)
+
+        arac_plaka = self.form_data.get('arac_plaka', '') or '-'
+
+        current_row += 1
+        create_cell(current_row, 0, arac_plaka, colspan=3, bg='#f5f5f5', font=('Arial', 10))
+        create_cell(current_row, 3, '', colspan=3, bg='white', border=False)
+
+        current_row += 1
+        create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
+
+        current_row += 1
+        create_cell(current_row, 0, "HAZIRLAYAN / GÖREVLENDİREN", colspan=3, bg='#fff176', font=('Arial', 12, 'bold'))
+        create_cell(current_row, 3, "İMZA", colspan=3, bg='#fff176', font=('Arial', 12, 'bold'))
+
+        hazirlayan = self.form_data.get('hazirlayan', '') or '-'
+
+        current_row += 1
+        create_cell(current_row, 0, hazirlayan, colspan=3, bg='#f5f5f5', font=('Arial', 10))
+        create_cell(current_row, 3, '', colspan=3, bg='white', border=False)
+
+        current_row += 1
+        create_cell(current_row, 0, '', colspan=6, bg='white', border=False, pady=4)
+
+        current_row += 1
+        create_cell(current_row, 0, "DURUM", colspan=2, bg='#4caf50', fg='white', font=('Arial', 12, 'bold'), anchor='center')
+        create_cell(current_row, 2, "TAMAMLANDI", colspan=4, bg='#c8e6c9', fg='#1b5e20', font=('Arial', 12, 'bold'), anchor='center')
+
+        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
         # Butonlar
