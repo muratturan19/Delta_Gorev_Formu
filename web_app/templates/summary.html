@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Form {{ form_no }} · Özet{% endblock %}
+
+{% block steps %}
+<div class="step-indicator">
+    {% for step in FORM_STEPS %}
+        <div class="step {{ 'complete' }}">
+            <span class="step-number">{{ loop.index }}</span>
+            <span class="step-title">{{ step.title }}</span>
+        </div>
+    {% endfor %}
+    <div class="step active">
+        <span class="step-number">Ö</span>
+        <span class="step-title">Özet</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<h2>📊 Form Özeti</h2>
+<div class="summary-card">
+    <div class="summary-header">
+        <div class="brand">
+            <strong>Delta Proje<br>Hidrolik &amp; Pnömatik</strong>
+        </div>
+        <div class="form-title">GÖREV FORMU</div>
+        <div class="form-meta">
+            <div class="meta-row"><span>FORM NO</span><strong>{{ form_no }}</strong></div>
+            <div class="meta-row"><span>TARİH</span><strong>{{ form_data.get('tarih', '-') or '-' }}</strong></div>
+            <div class="meta-row"><span>DOK.NO</span><strong>{{ form_data.get('dok_no', '-') or '-' }}</strong></div>
+            <div class="meta-row"><span>REV.NO/TRH</span><strong>{{ form_data.get('rev_no', '-') or '-' }}</strong></div>
+        </div>
+    </div>
+    <table class="summary-table">
+        <tbody>
+            <tr class="section">
+                <th colspan="2">GÖREVLİ PERSONEL</th>
+                <th colspan="2">AVANS TUTARI</th>
+                <th colspan="2">TAŞERON ŞİRKET</th>
+            </tr>
+            {% for index in range(1, 6) %}
+            <tr>
+                <td colspan="2">{{ form_data.get('personel_' ~ index, '') or '-' }}</td>
+                {% if loop.first %}
+                <td colspan="2" rowspan="5">{{ form_data.get('avans', '') or '-' }}</td>
+                <td colspan="2" rowspan="5">{{ form_data.get('taseron', '') or '-' }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+            <tr class="section">
+                <th colspan="6">GÖREV VE SAHA BİLGİLERİ</th>
+            </tr>
+            <tr>
+                <th class="label">Görevin Tanımı</th>
+                <td colspan="5">{{ form_data.get('gorev_tanimi', '') or '-' }}</td>
+            </tr>
+            <tr>
+                <th class="label">Görev Yeri</th>
+                <td colspan="5">{{ form_data.get('gorev_yeri', '') or '-' }}</td>
+            </tr>
+            <tr class="section">
+                <th colspan="6">SEYAHAT / ÇALIŞMA BİLGİLERİ</th>
+            </tr>
+            <tr>
+                <th class="label">Yola Çıkış Tarihi</th>
+                <td>{{ form_data.get('yola_cikis_tarih', '') or '-' }}</td>
+                <th class="label">Yola Çıkış Saati</th>
+                <td>{{ form_data.get('yola_cikis_saat', '') or '-' }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <th class="label">Dönüş Tarihi</th>
+                <td>{{ form_data.get('donus_tarih', '') or '-' }}</td>
+                <th class="label">Dönüş Saati</th>
+                <td>{{ form_data.get('donus_saat', '') or '-' }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <th class="label">Çalışma Başlangıç</th>
+                <td>{{ form_data.get('calisma_baslangic_tarih', '') or '-' }}</td>
+                <th class="label">Başlangıç Saati</th>
+                <td>{{ form_data.get('calisma_baslangic_saat', '') or '-' }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <th class="label">Çalışma Bitiş</th>
+                <td>{{ form_data.get('calisma_bitis_tarih', '') or '-' }}</td>
+                <th class="label">Bitiş Saati</th>
+                <td>{{ form_data.get('calisma_bitis_saat', '') or '-' }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <th class="label">Toplam Mola</th>
+                <td colspan="5">{% if form_data.get('mola_suresi') %}{{ form_data.get('mola_suresi') }} dakika{% else %}-{% endif %}</td>
+            </tr>
+            <tr class="section">
+                <th colspan="3">ARAÇ PLAKA NO</th>
+                <th colspan="3">HAZIRLAYAN / GÖREVLENDİREN</th>
+            </tr>
+            <tr>
+                <td colspan="3">{{ form_data.get('arac_plaka', '') or '-' }}</td>
+                <td colspan="3">{{ form_data.get('hazirlayan', '') or '-' }}</td>
+            </tr>
+            <tr class="status-row {{ 'status-complete' if status.is_complete else 'status-partial' }}">
+                <th colspan="2">DURUM</th>
+                <td colspan="4">{{ status.code }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% if missing_fields %}
+    <div class="missing-fields">
+        <strong>Eksik Alanlar:</strong>
+        <ul>
+            {% for field in missing_fields %}
+            <li>{{ field }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('form_summary', form_no=form_no) }}" class="summary-actions">
+        <input type="hidden" name="action" value="next">
+        <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
+        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+    </form>
+</div>
+{% endblock %}

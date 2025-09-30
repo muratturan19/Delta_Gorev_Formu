@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Ana Menü · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<div class="menu-grid">
+    <div class="menu-card accent-blue">
+        <h2>📝 Yeni Görev Oluştur</h2>
+        <p>Yeni bir görev formu numarası alarak adım adım formu doldurun.</p>
+        <a class="button primary" href="{{ url_for('new_form') }}">Yeni Form Başlat</a>
+    </div>
+    <div class="menu-card accent-yellow">
+        <h2>📂 Görev Formu Çağır</h2>
+        <p>Var olan bir form numarasını seçerek kaldığınız yerden devam edin.</p>
+        <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline">
+            <label for="form_no_select">Form No</label>
+            <select id="form_no_select" name="form_no_select">
+                <option value="">Form seçin...</option>
+                {% for number in form_numbers %}
+                    <option value="{{ number }}">{{ number }}</option>
+                {% endfor %}
+            </select>
+            <div class="divider">veya</div>
+            <input type="text" name="form_no_input" placeholder="Form no girin">
+            <button type="submit" class="button secondary">Formu Aç</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

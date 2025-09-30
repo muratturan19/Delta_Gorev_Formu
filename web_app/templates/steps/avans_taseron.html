@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Form {{ form_no }} · Avans ve Taşeron{% endblock %}
+
+{% block steps %}
+<div class="step-indicator">
+    {% for step in FORM_STEPS %}
+        <div class="step {{ 'active' if loop.index0 == step_index else '' }} {{ 'complete' if loop.index0 < step_index else '' }}">
+            <span class="step-number">{{ loop.index }}</span>
+            <span class="step-title">{{ step.title }}</span>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h2>💰 Avans ve Taşeron Bilgileri</h2>
+<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
+    <input type="hidden" name="action" value="next">
+    <div class="form-row">
+        <label for="avans">Avans Tutarı</label>
+        <input id="avans" name="avans" type="text" value="{{ form_data.get('avans', '') }}" placeholder="Örn. 1500 TL">
+    </div>
+    <div class="form-row">
+        <label for="taseron">Taşeron Şirket</label>
+        <select id="taseron" name="taseron">
+            <option value="">Seçiniz</option>
+            {% for option in taseron_options %}
+                <option value="{{ option }}" {% if form_data.get('taseron') == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
+        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+        <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
+    </div>
+</form>
+{% endblock %}

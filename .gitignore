@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+form_config.json
+gorev_formu_*.xlsx
+.env
