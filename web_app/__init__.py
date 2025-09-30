@@ -210,6 +210,26 @@ def register_routes(app: Flask) -> None:
             "is_admin": is_admin(),
         }
 
+    def get_locked_forms() -> List[str]:
+        return list(session.get("locked_forms", []))
+
+    def set_locked_forms(values: List[str]) -> None:
+        session["locked_forms"] = values
+
+    def is_form_locked(form_no: str) -> bool:
+        return form_no in set(get_locked_forms())
+
+    def lock_form(form_no: str) -> None:
+        locked = set(get_locked_forms())
+        locked.add(form_no)
+        set_locked_forms(sorted(locked))
+
+    def unlock_form(form_no: str) -> None:
+        locked = set(get_locked_forms())
+        if form_no in locked:
+            locked.remove(form_no)
+            set_locked_forms(sorted(locked))
+
     @app.route("/")
     def index():
         excel_files = glob.glob(str(BASE_PATH / "gorev_formu_*.xlsx"))
@@ -225,6 +245,20 @@ def register_routes(app: Flask) -> None:
         if not form_no:
             flash("Form numarası seçin veya girin.", "warning")
             return redirect(url_for("index"))
+        form_data = ensure_form_data(form_no)
+        if form_data is None:
+            return redirect(url_for("index"))
+
+        status = form_service.determine_form_status(form_data)
+        form_data["durum"] = status.code
+        store_form_in_session(form_no, form_data)
+
+        if status.is_complete:
+            lock_form(form_no)
+            flash("Tamamlanmış form özet görünümünde açıldı.", "info")
+            return redirect(url_for("form_summary", form_no=form_no))
+
+        unlock_form(form_no)
         return redirect(url_for("form_wizard", form_no=form_no, step=0))
 
     @app.route("/form/new")
@@ -251,6 +285,10 @@ def register_routes(app: Flask) -> None:
         if form_data is None:
             flash(f"Form {form_no} yüklenemedi.", "error")
             return redirect(url_for("index"))
+
+        if is_form_locked(form_no):
+            flash("Tamamlanmış formlar düzenlenemez. Özet sayfasına yönlendirildiniz.", "warning")
+            return redirect(url_for("form_summary", form_no=form_no))
 
         current_step = FORM_STEPS[step]
 
@@ -301,7 +339,12 @@ def register_routes(app: Flask) -> None:
         form_data["durum"] = status.code
         store_form_in_session(form_no, form_data)
 
+        locked = is_form_locked(form_no)
+
         if request.method == "POST":
+            if locked:
+                flash("Tamamlanmış formlar üzerinde değişiklik yapılamaz.", "warning")
+                return redirect(url_for("form_summary", form_no=form_no))
             action = request.form.get("action")
             if action == "save":
                 try:
@@ -327,6 +370,7 @@ def register_routes(app: Flask) -> None:
             form_data=form_data,
             status=status,
             missing_fields=missing_fields,
+            locked=locked,
         )
 
     @app.route("/admin", methods=["GET", "POST"])

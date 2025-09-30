@@ -119,10 +119,15 @@
         </ul>
     </div>
     {% endif %}
-    <form method="post" action="{{ url_for('form_summary', form_no=form_no) }}" class="summary-actions">
-        <input type="hidden" name="action" value="next">
-        <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
-        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
-    </form>
+    <div class="summary-actions">
+        <button type="button" class="button print" onclick="window.print()">🖨️ Yazdır</button>
+        {% if not locked %}
+        <form method="post" action="{{ url_for('form_summary', form_no=form_no) }}" class="summary-actions-form">
+            <input type="hidden" name="action" value="next">
+            <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
+            <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+        </form>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
