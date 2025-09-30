@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Form {{ form_no }} · Saat Bilgileri{% endblock %}
+
+{% block steps %}
+<div class="step-indicator">
+    {% for step in FORM_STEPS %}
+        <div class="step {{ 'active' if loop.index0 == step_index else '' }} {{ 'complete' if loop.index0 < step_index else '' }}">
+            <span class="step-number">{{ loop.index }}</span>
+            <span class="step-title">{{ step.title }}</span>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h2>🕐 Saat ve Tarih Bilgileri</h2>
+<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card form-scroll">
+    <input type="hidden" name="action" value="next">
+    <div class="grid grid-2">
+        <div class="form-row">
+            <label for="yola_cikis_tarih">Yola Çıkış Tarihi</label>
+            <input id="yola_cikis_tarih" name="yola_cikis_tarih" type="text" value="{{ form_data.get('yola_cikis_tarih', '') }}" placeholder="GG.AA.YYYY">
+        </div>
+        <div class="form-row">
+            <label for="yola_cikis_saat">Yola Çıkış Saati</label>
+            <input id="yola_cikis_saat" name="yola_cikis_saat" type="text" value="{{ form_data.get('yola_cikis_saat', '') }}" placeholder="SS:DD">
+        </div>
+        <div class="form-row">
+            <label for="donus_tarih">Dönüş Tarihi</label>
+            <input id="donus_tarih" name="donus_tarih" type="text" value="{{ form_data.get('donus_tarih', '') }}" placeholder="GG.AA.YYYY">
+        </div>
+        <div class="form-row">
+            <label for="donus_saat">Dönüş Saati</label>
+            <input id="donus_saat" name="donus_saat" type="text" value="{{ form_data.get('donus_saat', '') }}" placeholder="SS:DD">
+        </div>
+        <div class="form-row">
+            <label for="calisma_baslangic_tarih">Çalışma Başlangıç Tarihi</label>
+            <input id="calisma_baslangic_tarih" name="calisma_baslangic_tarih" type="text" value="{{ form_data.get('calisma_baslangic_tarih', '') }}" placeholder="GG.AA.YYYY">
+        </div>
+        <div class="form-row">
+            <label for="calisma_baslangic_saat">Çalışma Başlangıç Saati</label>
+            <input id="calisma_baslangic_saat" name="calisma_baslangic_saat" type="text" value="{{ form_data.get('calisma_baslangic_saat', '') }}" placeholder="SS:DD">
+        </div>
+        <div class="form-row">
+            <label for="calisma_bitis_tarih">Çalışma Bitiş Tarihi</label>
+            <input id="calisma_bitis_tarih" name="calisma_bitis_tarih" type="text" value="{{ form_data.get('calisma_bitis_tarih', '') }}" placeholder="GG.AA.YYYY">
+        </div>
+        <div class="form-row">
+            <label for="calisma_bitis_saat">Çalışma Bitiş Saati</label>
+            <input id="calisma_bitis_saat" name="calisma_bitis_saat" type="text" value="{{ form_data.get('calisma_bitis_saat', '') }}" placeholder="SS:DD">
+        </div>
+        <div class="form-row">
+            <label for="mola_suresi">Toplam Mola (dakika)</label>
+            <input id="mola_suresi" name="mola_suresi" type="number" min="0" step="5" value="{{ form_data.get('mola_suresi', '') }}">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
+        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+        <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
+    </div>
+</form>
+{% endblock %}

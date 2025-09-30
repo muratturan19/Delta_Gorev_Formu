@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Görev Formu Sistemi{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<header class="app-header">
+    <div class="container">
+        <h1>🔧 Delta Proje &mdash; Görev Formu Sistemi</h1>
+        <nav>
+            <a href="{{ url_for('index') }}">Ana Menü</a>
+            {% if form_no %}
+            <a href="{{ url_for('form_wizard', form_no=form_no, step=0) }}">Form {{ form_no }}</a>
+            <a href="{{ url_for('form_summary', form_no=form_no) }}">Özet</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+<main class="container">
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block steps %}{% endblock %}
+
+    <section class="content">
+        {% block content %}{% endblock %}
+    </section>
+</main>
+<footer class="app-footer">
+    <div class="container">
+        <small>&copy; {{ datetime.utcnow().year }} Delta Proje</small>
+    </div>
+</footer>
+<script>
+    document.querySelectorAll('[data-action="submit-step"]').forEach(function(button) {
+        button.addEventListener('click', function (event) {
+            var form = button.closest('form');
+            if (form) {
+                var actionInput = form.querySelector('input[name="action"]');
+                if (actionInput) {
+                    actionInput.value = button.dataset.value;
+                }
+            }
+        });
+    });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

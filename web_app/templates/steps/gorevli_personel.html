@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Form {{ form_no }} · Görevli Personel{% endblock %}
+
+{% block steps %}
+<div class="step-indicator">
+    {% for step in FORM_STEPS %}
+        <div class="step {{ 'active' if loop.index0 == step_index else '' }} {{ 'complete' if loop.index0 < step_index else '' }}">
+            <span class="step-number">{{ loop.index }}</span>
+            <span class="step-title">{{ step.title }}</span>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h2>👥 Görevli Personel</h2>
+<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
+    <input type="hidden" name="action" value="next">
+    {% for index in range(1, 6) %}
+    <div class="form-row">
+        <label for="personel_{{ index }}">Personel {{ index }}</label>
+        <select id="personel_{{ index }}" name="personel_{{ index }}" class="personel-select">
+            <option value="">Seçiniz</option>
+            {% for option in personel_options %}
+                <option value="{{ option }}" {% if form_data.get('personel_' ~ index) == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endfor %}
+    <div class="form-actions">
+        <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
+        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+        <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const selects = document.querySelectorAll('.personel-select');
+    selects.forEach(select => {
+        select.addEventListener('change', function() {
+            const values = Array.from(selects).map(el => el.value).filter(Boolean);
+            const duplicates = values.filter((value, index, arr) => arr.indexOf(value) !== index);
+            selects.forEach(el => el.classList.remove('duplicate'));
+            if (duplicates.length) {
+                selects.forEach(el => {
+                    if (duplicates.includes(el.value)) {
+                        el.classList.add('duplicate');
+                    }
+                });
+            }
+        });
+    });
+    selects.forEach(select => select.dispatchEvent(new Event('change')));
+</script>
+{% endblock %}
