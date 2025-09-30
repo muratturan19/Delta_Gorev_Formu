@@ -248,8 +248,15 @@ body {
 }
 
 .form-card.form-scroll {
-    max-height: 600px;
+    max-height: clamp(420px, 80vh, 640px);
     overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .form-card.form-scroll {
+        max-height: none;
+        overflow-y: visible;
+    }
 }
 
 .form-row {
@@ -351,10 +358,16 @@ body {
     color: #555;
 }
 
+.summary-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
 .summary-table {
     width: 100%;
     border-collapse: collapse;
     background: #fff;
+    min-width: 720px;
 }
 
 .summary-table th,

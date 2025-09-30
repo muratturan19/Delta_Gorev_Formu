@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Servis katmanı: Görev formu veri işlemleri."""
 from __future__ import annotations
 

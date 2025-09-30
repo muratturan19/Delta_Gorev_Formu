@@ -19,35 +19,35 @@
     <div class="grid grid-2">
         <div class="form-row">
             <label for="yola_cikis_tarih">Yola Çıkış Tarihi</label>
-            <input id="yola_cikis_tarih" name="yola_cikis_tarih" type="text" value="{{ form_data.get('yola_cikis_tarih', '') }}" placeholder="GG.AA.YYYY">
+            <input id="yola_cikis_tarih" name="yola_cikis_tarih" type="date" value="{{ form_data.get('yola_cikis_tarih', '') | to_html_date }}">
         </div>
         <div class="form-row">
             <label for="yola_cikis_saat">Yola Çıkış Saati</label>
-            <input id="yola_cikis_saat" name="yola_cikis_saat" type="text" value="{{ form_data.get('yola_cikis_saat', '') }}" placeholder="SS:DD">
+            <input id="yola_cikis_saat" name="yola_cikis_saat" type="time" value="{{ form_data.get('yola_cikis_saat', '') }}">
         </div>
         <div class="form-row">
             <label for="donus_tarih">Dönüş Tarihi</label>
-            <input id="donus_tarih" name="donus_tarih" type="text" value="{{ form_data.get('donus_tarih', '') }}" placeholder="GG.AA.YYYY">
+            <input id="donus_tarih" name="donus_tarih" type="date" value="{{ form_data.get('donus_tarih', '') | to_html_date }}">
         </div>
         <div class="form-row">
             <label for="donus_saat">Dönüş Saati</label>
-            <input id="donus_saat" name="donus_saat" type="text" value="{{ form_data.get('donus_saat', '') }}" placeholder="SS:DD">
+            <input id="donus_saat" name="donus_saat" type="time" value="{{ form_data.get('donus_saat', '') }}">
         </div>
         <div class="form-row">
             <label for="calisma_baslangic_tarih">Çalışma Başlangıç Tarihi</label>
-            <input id="calisma_baslangic_tarih" name="calisma_baslangic_tarih" type="text" value="{{ form_data.get('calisma_baslangic_tarih', '') }}" placeholder="GG.AA.YYYY">
+            <input id="calisma_baslangic_tarih" name="calisma_baslangic_tarih" type="date" value="{{ form_data.get('calisma_baslangic_tarih', '') | to_html_date }}">
         </div>
         <div class="form-row">
             <label for="calisma_baslangic_saat">Çalışma Başlangıç Saati</label>
-            <input id="calisma_baslangic_saat" name="calisma_baslangic_saat" type="text" value="{{ form_data.get('calisma_baslangic_saat', '') }}" placeholder="SS:DD">
+            <input id="calisma_baslangic_saat" name="calisma_baslangic_saat" type="time" value="{{ form_data.get('calisma_baslangic_saat', '') }}">
         </div>
         <div class="form-row">
             <label for="calisma_bitis_tarih">Çalışma Bitiş Tarihi</label>
-            <input id="calisma_bitis_tarih" name="calisma_bitis_tarih" type="text" value="{{ form_data.get('calisma_bitis_tarih', '') }}" placeholder="GG.AA.YYYY">
+            <input id="calisma_bitis_tarih" name="calisma_bitis_tarih" type="date" value="{{ form_data.get('calisma_bitis_tarih', '') | to_html_date }}">
         </div>
         <div class="form-row">
             <label for="calisma_bitis_saat">Çalışma Bitiş Saati</label>
-            <input id="calisma_bitis_saat" name="calisma_bitis_saat" type="text" value="{{ form_data.get('calisma_bitis_saat', '') }}" placeholder="SS:DD">
+            <input id="calisma_bitis_saat" name="calisma_bitis_saat" type="time" value="{{ form_data.get('calisma_bitis_saat', '') }}">
         </div>
         <div class="form-row">
             <label for="mola_suresi">Toplam Mola (dakika)</label>
