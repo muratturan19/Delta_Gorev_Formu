@@ -30,4 +30,71 @@
         <a class="button" href="{{ url_for('admin_panel') }}">Admin Panelini Aç</a>
     </div>
 </div>
+
+<section class="search-section">
+    <div class="search-header">
+        <h2>🔍 Görev Sorgulama</h2>
+        <p>Belirli bir personel, şehir veya tarih aralığına göre geçmiş görevleri filtreleyin.</p>
+    </div>
+    <form method="get" action="{{ url_for('index') }}" class="search-form">
+        <div class="form-group">
+            <label for="personel">Personel</label>
+            <input type="text" id="personel" name="personel" placeholder="Örn. Ahmet" value="{{ search_filters.personel }}">
+        </div>
+        <div class="form-group">
+            <label for="gorev_yeri">Görev Yeri</label>
+            <input type="text" id="gorev_yeri" name="gorev_yeri" placeholder="Örn. Ankara" value="{{ search_filters.gorev_yeri }}">
+        </div>
+        <div class="form-group">
+            <label for="start_date">Başlangıç Tarihi</label>
+            <input type="date" id="start_date" name="start_date" value="{{ search_filters.start_date }}">
+        </div>
+        <div class="form-group">
+            <label for="end_date">Bitiş Tarihi</label>
+            <input type="date" id="end_date" name="end_date" value="{{ search_filters.end_date }}">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="button primary">Sorgula</button>
+            <a class="button secondary" href="{{ url_for('index') }}">Temizle</a>
+        </div>
+    </form>
+
+    <div class="search-results">
+        {% if performed_search %}
+            {% if search_results %}
+                <div class="results-grid">
+                    {% for result in search_results %}
+                    <article class="result-card">
+                        <header>
+                            <h3>Form {{ result.form_no }}</h3>
+                            <span class="status {{ 'complete' if result.durum == 'TAMAMLANDI' else 'partial' }}">{{ result.durum or 'YARIM' }}</span>
+                        </header>
+                        <ul class="result-meta">
+                            <li><strong>Tarih:</strong> {{ result.yola_cikis_tarih or result.tarih or '-' }}</li>
+                            <li><strong>Görev Yeri:</strong> {{ result.gorev_yeri or '-' }}</li>
+                            <li><strong>Hazırlayan:</strong> {{ result.hazirlayan or '-' }}</li>
+                        </ul>
+                        {% if result.personel %}
+                        <div class="result-personel">
+                            <strong>Personel:</strong>
+                            <span>{{ result.personel | join(', ') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if result.gorev_tanimi %}
+                        <p class="result-description">{{ result.gorev_tanimi }}</p>
+                        {% endif %}
+                        <footer>
+                            <a class="button link" href="{{ url_for('form_summary', form_no=result.form_no) }}">Formu Aç</a>
+                        </footer>
+                    </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-results">Kriterlere uygun kayıt bulunamadı.</p>
+            {% endif %}
+        {% else %}
+            <p class="no-results">Filtreleri kullanarak geçmiş görevleri arayabilirsiniz.</p>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}

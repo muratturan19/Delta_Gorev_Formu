@@ -1,10 +1,9 @@
-import os
-import sys
+import sqlite3
 from pathlib import Path
-from typing import Optional
 
-import openpyxl
 import pytest
+
+import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -40,6 +39,15 @@ def sample_form_data():
     }
 
 
+def _fetch_form(base_path: Path, form_no: str):
+    db_path = base_path / form_service.DB_FILENAME
+    assert db_path.exists()
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute("SELECT * FROM forms WHERE form_no = ?", (form_no,)).fetchone()
+    return row
+
+
 def test_determine_form_status_complete(sample_form_data):
     status = form_service.determine_form_status(sample_form_data)
 
@@ -63,39 +71,69 @@ def test_get_next_form_no_increments(tmp_path):
 
     assert first == "00001"
     assert second == "00002"
-    config_path = tmp_path / form_service.CONFIG_FILE_NAME
-    assert config_path.exists()
+    assert (tmp_path / form_service.DB_FILENAME).exists()
 
-
-def _find_status_value(filename: str) -> Optional[str]:
-    workbook = openpyxl.load_workbook(filename)
-    worksheet = workbook.active
-    for cell in worksheet['A']:
-        if cell.value == 'DURUM':
-            return worksheet[f'B{cell.row}'].value
-    return None
- 
 
 def test_save_partial_form(tmp_path, sample_form_data):
-    filename, status = form_service.save_partial_form(
+    db_path, status = form_service.save_partial_form(
         "00042", sample_form_data, base_path=str(tmp_path)
     )
 
     assert status.code == "YARIM"
-    assert os.path.exists(filename)
-    assert _find_status_value(filename) == "YARIM"
+    assert Path(db_path).exists()
+    stored = _fetch_form(tmp_path, "00042")
+    assert stored["durum"] == "YARIM"
+    assert stored["gorev_yeri"] == sample_form_data["gorev_yeri"]
 
 
 def test_save_and_load_form(tmp_path, sample_form_data):
-    filename, status = form_service.save_form(
+    db_path, status = form_service.save_form(
         "00077", sample_form_data, base_path=str(tmp_path)
     )
 
     assert status.code == "TAMAMLANDI"
     assert status.is_complete
-    assert os.path.exists(filename)
-    assert _find_status_value(filename) == "TAMAMLANDI"
+    assert Path(db_path).exists()
+
+    stored = _fetch_form(tmp_path, "00077")
+    assert stored["durum"] == "TAMAMLANDI"
 
     loaded = form_service.load_form_data("00077", base_path=str(tmp_path))
     assert loaded["gorev_yeri"] == sample_form_data["gorev_yeri"]
     assert loaded["durum"] == "TAMAMLANDI"
+
+
+def test_search_forms_filters(tmp_path, sample_form_data):
+    form_service.save_form("00001", sample_form_data, base_path=str(tmp_path))
+
+    other = dict(sample_form_data)
+    other.update(
+        {
+            "gorev_yeri": "Ankara",
+            "personel_1": "Mehmet",
+            "personel_2": "Ayşe",
+            "yola_cikis_tarih": "15.03.2024",
+            "donus_tarih": "16.03.2024",
+        }
+    )
+    form_service.save_form("00002", other, base_path=str(tmp_path))
+
+    results = form_service.search_forms(
+        person="ali",
+        location="istanbul",
+        start_date="2024-01-01",
+        end_date="2024-01-31",
+        base_path=str(tmp_path),
+    )
+    assert len(results) == 1
+    assert results[0]["form_no"] == "00001"
+
+    ankara_results = form_service.search_forms(
+        location="Ankara",
+        start_date="2024-03-01",
+        end_date="2024-03-31",
+        base_path=str(tmp_path),
+    )
+    assert len(ankara_results) == 1
+    assert ankara_results[0]["form_no"] == "00002"
+    assert "Mehmet" in ankara_results[0]["personel"]

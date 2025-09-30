@@ -992,7 +992,7 @@ class GorevFormuApp:
         """Kısmi formu kaydet (Görev Yeri'ne kadar)"""
         self.collect_form_data()
         try:
-            filename, status = form_service.save_partial_form(self.form_no, self.form_data)
+            _, status = form_service.save_partial_form(self.form_no, self.form_data)
         except FormServiceError as exc:
             messagebox.showerror("Hata", str(exc))
             return
@@ -1001,7 +1001,7 @@ class GorevFormuApp:
 
         messagebox.showinfo(
             "Başarılı",
-            f"Form oluşturuldu!\n\nForm No: {self.form_no}\nDosya: {filename}\n\nGörev tamamlandığında 'GÖREV FORMU ÇAĞIR' ile bu formu açıp kalan kısımları doldurun."
+            f"Form oluşturuldu!\n\nForm No: {self.form_no}\nVeriler veritabanına kaydedildi.\n\nGörev tamamlandığında 'GÖREV FORMU ÇAĞIR' ile bu formu açıp kalan kısımları doldurun."
         )
 
         self.show_main_menu()
@@ -1010,7 +1010,7 @@ class GorevFormuApp:
         """Formu kaydet"""
         self.collect_form_data()
         try:
-            filename, status = form_service.save_form(self.form_no, self.form_data)
+            _, status = form_service.save_form(self.form_no, self.form_data)
         except FormServiceError as exc:
             messagebox.showerror("Hata", str(exc))
             return
@@ -1020,12 +1020,12 @@ class GorevFormuApp:
         if stay_on_step:
             messagebox.showinfo(
                 "Kaydedildi",
-                f"Form {status.code} olarak kaydedildi.\n\nForm No: {self.form_no}\nDosya: {filename}"
+                f"Form {status.code} olarak veritabanına kaydedildi.\n\nForm No: {self.form_no}"
             )
         else:
             messagebox.showinfo(
                 "Başarılı",
-                f"Form {status.code} olarak kaydedildi!\n\nForm No: {self.form_no}\nDosya: {filename}"
+                f"Form {status.code} olarak kaydedildi!\n\nForm No: {self.form_no}\nVeriler veritabanına işlendi."
             )
             self.show_main_menu()
 

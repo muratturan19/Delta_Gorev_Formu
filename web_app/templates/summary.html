@@ -120,6 +120,8 @@
     </div>
     {% endif %}
     <div class="summary-actions">
+        <a class="button export" href="{{ url_for('export_form_excel', form_no=form_no) }}">📊 Excel'e Aktar</a>
+        <a class="button export" href="{{ url_for('export_form_pdf', form_no=form_no) }}">📄 PDF'e Aktar</a>
         <button type="button" class="button print" onclick="window.print()">🖨️ Yazdır</button>
         {% if not locked %}
         <form method="post" action="{{ url_for('form_summary', form_no=form_no) }}" class="summary-actions-form">
