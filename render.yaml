@@ -3,4 +3,4 @@ services:
     name: delta-gorev-formu
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m web_app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT 'web_app:app'
