@@ -9,7 +9,10 @@
 <body>
 <header class="app-header">
     <div class="container">
-        <h1>🔧 Delta Proje &mdash; Görev Formu Sistemi</h1>
+        <div class="app-brand">
+            <img src="{{ url_for('static', filename='images/delta_logo.png') }}" alt="Delta Proje logosu" class="app-logo">
+            <h1>Delta Proje &mdash; Görev Formu Sistemi</h1>
+        </div>
         <nav>
             <a href="{{ url_for('index') }}">Ana Menü</a>
             {% if form_no %}
