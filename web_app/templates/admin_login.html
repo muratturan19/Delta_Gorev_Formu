@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Admin Girişi · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<div class="form-card narrow">
+    <h2>🔐 Admin Paneli</h2>
+    <p>Admin paneline erişmek için şifreyi girin.</p>
+    <form method="post" action="{{ url_for('admin_panel') }}" class="stacked">
+        <label for="password">Şifre</label>
+        <input type="password" id="password" name="password" placeholder="Admin şifresi" required>
+        <button type="submit" class="button primary">Giriş Yap</button>
+    </form>
+</div>
+{% endblock %}
