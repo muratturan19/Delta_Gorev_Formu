@@ -85,6 +85,13 @@ DEFAULT_DYNAMIC_DATA: Dict[str, List[str]] = {
         "Zeynep Ak",
         "Elif Kaya",
     ],
+    "arac_plaka_options": [
+        "34 ABC 123",
+        "34 XYZ 456",
+        "06 DEF 789",
+        "16 GHI 321",
+        "35 JKL 654",
+    ],
 }
 
 _dynamic_data: Dict[str, List[str]] | None = None
@@ -199,6 +206,7 @@ def register_routes(app: Flask) -> None:
             "personel_options": dynamic_data["personel_options"],
             "taseron_options": dynamic_data["taseron_options"],
             "hazirlayan_options": dynamic_data["hazirlayan_options"],
+            "arac_plaka_options": dynamic_data["arac_plaka_options"],
             "is_admin": is_admin(),
         }
 
@@ -279,6 +287,7 @@ def register_routes(app: Flask) -> None:
             personel_options=dynamic_data["personel_options"],
             taseron_options=dynamic_data["taseron_options"],
             hazirlayan_options=dynamic_data["hazirlayan_options"],
+            arac_plaka_options=dynamic_data["arac_plaka_options"],
         )
 
     @app.route("/form/<form_no>/summary", methods=["GET", "POST"])
