@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import glob
@@ -106,6 +107,20 @@ def create_app() -> Flask:
 
 def register_routes(app: Flask) -> None:
     total_steps = len(FORM_STEPS)
+
+    @app.template_filter("to_html_date")
+    def to_html_date(value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            return ""
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+            try:
+                parsed = datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+            else:
+                return parsed.strftime("%Y-%m-%d")
+        return value
 
     @app.context_processor
     def inject_globals():  # pragma: no cover - template helper
@@ -257,6 +272,28 @@ def register_routes(app: Flask) -> None:
         forms[form_no] = form_data
         session["forms"] = forms
 
+    def normalize_date(value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            return ""
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+            try:
+                parsed = datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+            else:
+                return parsed.strftime("%d.%m.%Y")
+        return value
+
+    def normalize_time(value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            return ""
+        try:
+            return datetime.strptime(value, "%H:%M").strftime("%H:%M")
+        except ValueError:
+            return value
+
     def update_form_data_from_request(form_data: Dict[str, str], step_id: str, data) -> None:
         if step_id == "form_bilgileri":
             form_data["dok_no"] = data.get("dok_no", "").strip()
@@ -275,18 +312,24 @@ def register_routes(app: Flask) -> None:
         elif step_id == "gorev_yeri":
             form_data["gorev_yeri"] = data.get("gorev_yeri", "").strip()
         elif step_id == "saat_bilgileri":
-            for field in [
+            date_fields = [
                 "yola_cikis_tarih",
-                "yola_cikis_saat",
                 "donus_tarih",
-                "donus_saat",
                 "calisma_baslangic_tarih",
-                "calisma_baslangic_saat",
                 "calisma_bitis_tarih",
+            ]
+            time_fields = [
+                "yola_cikis_saat",
+                "donus_saat",
+                "calisma_baslangic_saat",
                 "calisma_bitis_saat",
-                "mola_suresi",
-            ]:
-                form_data[field] = data.get(field, "").strip()
+            ]
+
+            for field in date_fields:
+                form_data[field] = normalize_date(data.get(field, ""))
+            for field in time_fields:
+                form_data[field] = normalize_time(data.get(field, ""))
+            form_data["mola_suresi"] = data.get("mola_suresi", "").strip()
         elif step_id == "arac_bilgisi":
             form_data["arac_plaka"] = data.get("arac_plaka", "").strip()
         elif step_id == "hazirlayan":

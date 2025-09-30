@@ -31,8 +31,9 @@
             <div class="meta-row"><span>REV.NO/TRH</span><strong>{{ form_data.get('rev_no', '-') or '-' }}</strong></div>
         </div>
     </div>
-    <table class="summary-table">
-        <tbody>
+    <div class="summary-table-wrapper">
+        <table class="summary-table">
+            <tbody>
             <tr class="section">
                 <th colspan="2">GÖREVLİ PERSONEL</th>
                 <th colspan="2">AVANS TUTARI</th>
@@ -105,8 +106,9 @@
                 <th colspan="2">DURUM</th>
                 <td colspan="4">{{ status.code }}</td>
             </tr>
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
     {% if missing_fields %}
     <div class="missing-fields">
         <strong>Eksik Alanlar:</strong>
