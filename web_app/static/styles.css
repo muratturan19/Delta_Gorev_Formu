@@ -201,6 +201,12 @@ body {
     box-shadow: 0 8px 18px rgba(76, 175, 80, 0.25);
 }
 
+.button.print {
+    background: #37474f;
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(55, 71, 79, 0.25);
+}
+
 .button:hover {
     transform: translateY(-1px);
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
@@ -479,8 +485,15 @@ body {
 .summary-actions {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: 12px;
     margin: 24px 32px 0;
+    flex-wrap: wrap;
+}
+
+.summary-actions-form {
+    display: flex;
+    gap: 12px;
 }
 
 @media (max-width: 768px) {
@@ -506,5 +519,61 @@ body {
     .summary-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+}
+
+@media print {
+    body {
+        background: #fff;
+    }
+
+    .app-header,
+    .app-footer,
+    .app-header nav,
+    .step-indicator,
+    .summary-actions,
+    .flash-container {
+        display: none !important;
+    }
+
+    .container {
+        width: 100%;
+        margin: 0;
+    }
+
+    .content {
+        padding: 0;
+    }
+
+    .summary-card {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0;
+        page-break-inside: avoid;
+    }
+
+    .summary-header {
+        background: none;
+        color: #000;
+    }
+
+    .summary-header .form-title {
+        color: #000;
+        background: none;
+    }
+
+    .summary-header .form-meta {
+        box-shadow: none;
+        background: none;
+    }
+
+    .summary-table {
+        min-width: auto;
+    }
+
+    .summary-table th,
+    .summary-table td {
+        background: #fff !important;
+        color: #000 !important;
     }
 }
