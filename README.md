@@ -35,9 +35,10 @@ tests/               # Pytest senaryoları
 ## Web Uygulamasını Çalıştırma
 1. Proje klasöründe aşağıdaki komutla geliştirme sunucusunu başlatın:
    ```bash
-   flask --app web_app run --debug
+   flask --app web_app run --debug --host=0.0.0.0
    ```
-   Alternatif olarak `python -m flask --app web_app run` kullanabilirsiniz.
+   Alternatif olarak `python -m flask --app web_app run --host=0.0.0.0`
+   kullanabilirsiniz.
 2. Tarayıcınızda [http://localhost:5000](http://localhost:5000) adresine gidin.
 3. Ana ekrandan yeni form başlatabilir veya mevcut bir form numarasını girerek düzenlemeye devam edebilirsiniz.
 
@@ -55,3 +56,18 @@ senaryoları mevcuttur. Testleri çalıştırmak için:
 ```bash
 pytest
 ```
+
+## Render (ve benzeri platformlarda) Yayınlama
+
+Render gibi barındırma platformları uygulamanın `0.0.0.0` adresine bağlanmasını
+ve kendilerinin tanımladığı `PORT` ortam değişkenini dinlemesini bekler. Bu
+proje için başlangıç komutunu aşağıdaki gibi tanımlayabilirsiniz:
+
+```bash
+python -m web_app
+```
+
+Komut, `web_app` paketindeki yeni komut satırı giriş noktasını kullanarak Flask
+uygulamasını doğru host ve port ayarlarıyla başlatır. Geliştirme ortamında da
+aynı komutu kullanabilirsiniz; `FLASK_DEBUG=1` gibi bir değişken tanımladığınızda
+otomatik olarak debug modu açılır.
