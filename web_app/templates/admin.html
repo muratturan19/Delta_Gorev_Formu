@@ -8,6 +8,12 @@
 <section class="form-card">
     <h3>Listeleri Düzenle</h3>
     <form method="post" action="{{ url_for('admin_update') }}" class="stacked">
+        <label for="default_dok_no">Varsayılan Döküman No</label>
+        <input id="default_dok_no" name="default_dok_no" type="text" value="{{ form_defaults.dok_no }}" required>
+
+        <label for="default_rev_no">Varsayılan Revizyon</label>
+        <input id="default_rev_no" name="default_rev_no" type="text" value="{{ form_defaults.rev_no }}" placeholder="00 / 06.05.24" required>
+
         <label for="personel_options">Personel Listesi (her satıra bir değer)</label>
         <textarea id="personel_options" name="personel_options" rows="8">{{ data.personel_options | join('\n') }}</textarea>
 

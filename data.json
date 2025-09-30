@@ -24,5 +24,9 @@
     "Mehmet Korkmaz",
     "Zeynep Ak",
     "Elif Kaya"
-  ]
+  ],
+  "form_defaults": {
+    "dok_no": "F-001",
+    "rev_no": "00 / 06.05.24"
+  }
 }
