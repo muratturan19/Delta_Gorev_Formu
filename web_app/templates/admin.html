@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Admin Paneli · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<h2>🛠️ Admin Paneli</h2>
+<p>Buradan açılır menülerde kullanılan verileri düzenleyebilir veya yeni bir JSON dosyası yükleyebilirsiniz.</p>
+
+<section class="form-card">
+    <h3>Listeleri Düzenle</h3>
+    <form method="post" action="{{ url_for('admin_update') }}" class="stacked">
+        <label for="personel_options">Personel Listesi (her satıra bir değer)</label>
+        <textarea id="personel_options" name="personel_options" rows="8">{{ data.personel_options | join('\n') }}</textarea>
+
+        <label for="taseron_options">Taşeron Şirketler</label>
+        <textarea id="taseron_options" name="taseron_options" rows="6">{{ data.taseron_options | join('\n') }}</textarea>
+
+        <label for="hazirlayan_options">Hazırlayan / Görevlendiren</label>
+        <textarea id="hazirlayan_options" name="hazirlayan_options" rows="6">{{ data.hazirlayan_options | join('\n') }}</textarea>
+
+        <button type="submit" class="button save">💾 Değişiklikleri Kaydet</button>
+    </form>
+</section>
+
+<section class="form-card">
+    <h3>JSON Dosyası Yükle</h3>
+    <p>"personel_options", "taseron_options" ve "hazirlayan_options" anahtarlarını içeren bir JSON dosyası yükleyerek verileri toplu olarak güncelleyebilirsiniz.</p>
+    <form method="post" action="{{ url_for('admin_upload') }}" enctype="multipart/form-data" class="stacked">
+        <input type="file" name="data_file" accept="application/json" required>
+        <button type="submit" class="button secondary">📁 Dosyayı Yükle</button>
+    </form>
+</section>
+
+<a class="button" href="{{ url_for('admin_logout') }}">Çıkış Yap</a>
+{% endblock %}

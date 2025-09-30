@@ -110,7 +110,8 @@ body {
 }
 
 .menu-card.accent-blue::before,
-.menu-card.accent-yellow::before {
+.menu-card.accent-yellow::before,
+.menu-card.accent-green::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -124,6 +125,10 @@ body {
 
 .menu-card.accent-yellow::before {
     background: linear-gradient(135deg, #fff176, var(--secondary));
+}
+
+.menu-card.accent-green::before {
+    background: linear-gradient(135deg, #a5d6a7, var(--success));
 }
 
 .menu-card .button {
@@ -247,6 +252,11 @@ body {
     margin-bottom: 40px;
 }
 
+.form-card.narrow {
+    max-width: 420px;
+    margin: 0 auto 40px;
+}
+
 .form-card.form-scroll {
     max-height: clamp(420px, 80vh, 640px);
     overflow-y: auto;
@@ -282,6 +292,23 @@ body {
 .form-row textarea {
     min-height: 160px;
     resize: vertical;
+}
+
+.stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.stacked label {
+    font-weight: 600;
+}
+
+.stacked input,
+.stacked textarea,
+.stacked button,
+.stacked select {
+    width: 100%;
 }
 
 .form-actions {

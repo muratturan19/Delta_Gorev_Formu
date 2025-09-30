@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import glob
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +15,7 @@ from core import form_service
 from core.form_service import FormServiceError
 
 BASE_PATH = Path(__file__).resolve().parents[1]
+DATA_FILE = BASE_PATH / "data.json"
 DEFAULT_FORM_VALUES: Dict[str, str] = {
     "dok_no": "F-001",
     "rev_no": "",
@@ -56,34 +58,37 @@ FIELD_LABELS: Dict[str, str] = {
     "hazirlayan": "Hazırlayan",
 }
 
-PERSONEL_OPTIONS: List[str] = [
-    "Ahmet Yılmaz",
-    "Mehmet Demir",
-    "Ali Kaya",
-    "Veli Çelik",
-    "Hasan Şahin",
-    "Hüseyin Aydın",
-    "İbrahim Özdemir",
-    "Mustafa Arslan",
-    "Emre Doğan",
-    "Burak Yıldız",
-]
+DEFAULT_DYNAMIC_DATA: Dict[str, List[str]] = {
+    "personel_options": [
+        "Ahmet Yılmaz",
+        "Mehmet Demir",
+        "Ali Kaya",
+        "Veli Çelik",
+        "Hasan Şahin",
+        "Hüseyin Aydın",
+        "İbrahim Özdemir",
+        "Mustafa Arslan",
+        "Emre Doğan",
+        "Burak Yıldız",
+    ],
+    "taseron_options": [
+        "Yok",
+        "ABC İnşaat",
+        "XYZ Teknik",
+        "Marmara Mühendislik",
+        "Anadolu Yapı",
+    ],
+    "hazirlayan_options": [
+        "Ali Yılmaz",
+        "Ayşe Demir",
+        "Mehmet Korkmaz",
+        "Zeynep Ak",
+        "Elif Kaya",
+    ],
+}
 
-TASERON_OPTIONS: List[str] = [
-    "Yok",
-    "ABC İnşaat",
-    "XYZ Teknik",
-    "Marmara Mühendislik",
-    "Anadolu Yapı",
-]
-
-HAZIRLAYAN_OPTIONS: List[str] = [
-    "Ali Yılmaz",
-    "Ayşe Demir",
-    "Mehmet Korkmaz",
-    "Zeynep Ak",
-    "Elif Kaya",
-]
+_dynamic_data: Dict[str, List[str]] | None = None
+ADMIN_PASSWORD = os.environ.get("ADMIN_PANEL_PASSWORD") or os.environ.get("ADMIN_PASSWORD") or "delta-admin"
 
 FORM_STEPS: List[Dict[str, str]] = [
     {"id": "form_bilgileri", "title": "Form Bilgileri", "template": "steps/form_bilgileri.html"},
@@ -97,6 +102,60 @@ FORM_STEPS: List[Dict[str, str]] = [
 ]
 
 
+def normalize_options(values) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    seen = set()
+    normalized: List[str] = []
+    for item in values:
+        if not isinstance(item, str):
+            continue
+        cleaned = item.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    return normalized
+
+
+def load_dynamic_data() -> Dict[str, List[str]]:
+    data = {key: list(value) for key, value in DEFAULT_DYNAMIC_DATA.items()}
+    if not DATA_FILE.exists():
+        return data
+    try:
+        with DATA_FILE.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return data
+
+    for key, default_values in DEFAULT_DYNAMIC_DATA.items():
+        values = normalize_options(payload.get(key, default_values))
+        data[key] = values or list(default_values)
+    return data
+
+
+def save_dynamic_data(data: Dict[str, List[str]]) -> None:
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with DATA_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=False, indent=2)
+
+
+def get_dynamic_data() -> Dict[str, List[str]]:
+    global _dynamic_data
+    if _dynamic_data is None:
+        _dynamic_data = load_dynamic_data()
+    return _dynamic_data
+
+
+def set_dynamic_data(data: Dict[str, List[str]]) -> None:
+    global _dynamic_data
+    normalized: Dict[str, List[str]] = {}
+    for key, default_values in DEFAULT_DYNAMIC_DATA.items():
+        normalized[key] = normalize_options(data.get(key, default_values)) or list(default_values)
+    _dynamic_data = normalized
+    save_dynamic_data(normalized)
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
@@ -107,6 +166,15 @@ def create_app() -> Flask:
 
 def register_routes(app: Flask) -> None:
     total_steps = len(FORM_STEPS)
+
+    def is_admin() -> bool:
+        return bool(session.get("is_admin"))
+
+    def ensure_admin_access():
+        if not is_admin():
+            flash("Admin paneline erişmek için giriş yapın.", "error")
+            return redirect(url_for("admin_panel"))
+        return None
 
     @app.template_filter("to_html_date")
     def to_html_date(value: str) -> str:
@@ -124,9 +192,14 @@ def register_routes(app: Flask) -> None:
 
     @app.context_processor
     def inject_globals():  # pragma: no cover - template helper
+        dynamic_data = get_dynamic_data()
         return {
             "FORM_STEPS": FORM_STEPS,
             "total_steps": total_steps,
+            "personel_options": dynamic_data["personel_options"],
+            "taseron_options": dynamic_data["taseron_options"],
+            "hazirlayan_options": dynamic_data["hazirlayan_options"],
+            "is_admin": is_admin(),
         }
 
     @app.route("/")
@@ -197,14 +270,15 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("form_summary", form_no=form_no))
             return redirect(url_for("form_wizard", form_no=form_no, step=next_step))
 
+        dynamic_data = get_dynamic_data()
         return render_template(
             current_step["template"],
             form_no=form_no,
             form_data=form_data,
             step_index=step,
-            personel_options=PERSONEL_OPTIONS,
-            taseron_options=TASERON_OPTIONS,
-            hazirlayan_options=HAZIRLAYAN_OPTIONS,
+            personel_options=dynamic_data["personel_options"],
+            taseron_options=dynamic_data["taseron_options"],
+            hazirlayan_options=dynamic_data["hazirlayan_options"],
         )
 
     @app.route("/form/<form_no>/summary", methods=["GET", "POST"])
@@ -245,6 +319,69 @@ def register_routes(app: Flask) -> None:
             status=status,
             missing_fields=missing_fields,
         )
+
+    @app.route("/admin", methods=["GET", "POST"])
+    def admin_panel():
+        if not is_admin():
+            if request.method == "POST":
+                password = request.form.get("password", "")
+                if password == ADMIN_PASSWORD:
+                    session["is_admin"] = True
+                    flash("Admin paneline giriş yapıldı.", "success")
+                    return redirect(url_for("admin_panel"))
+                flash("Hatalı şifre.", "error")
+            return render_template("admin_login.html")
+
+        dynamic_data = get_dynamic_data()
+        return render_template("admin.html", data=dynamic_data)
+
+    @app.post("/admin/update")
+    def admin_update():
+        response = ensure_admin_access()
+        if response is not None:
+            return response
+
+        current_data = get_dynamic_data()
+        updated_data: Dict[str, List[str]] = {}
+        for key in current_data:
+            raw_value = request.form.get(key, "")
+            lines = [line.strip() for line in raw_value.splitlines()]
+            updated_data[key] = [line for line in lines if line]
+
+        set_dynamic_data(updated_data)
+        flash("Veri listeleri güncellendi.", "success")
+        return redirect(url_for("admin_panel"))
+
+    @app.post("/admin/upload")
+    def admin_upload():
+        response = ensure_admin_access()
+        if response is not None:
+            return response
+
+        data_file = request.files.get("data_file")
+        if data_file is None or not data_file.filename:
+            flash("Lütfen bir JSON dosyası seçin.", "warning")
+            return redirect(url_for("admin_panel"))
+
+        try:
+            payload = json.loads(data_file.read().decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            flash("JSON dosyası okunamadı.", "error")
+            return redirect(url_for("admin_panel"))
+
+        if not isinstance(payload, dict):
+            flash("Geçersiz JSON formatı.", "error")
+            return redirect(url_for("admin_panel"))
+
+        set_dynamic_data({key: payload.get(key, []) for key in DEFAULT_DYNAMIC_DATA})
+        flash("Yeni JSON dosyası yüklendi.", "success")
+        return redirect(url_for("admin_panel"))
+
+    @app.get("/admin/logout")
+    def admin_logout():
+        session.pop("is_admin", None)
+        flash("Admin oturumu kapatıldı.", "info")
+        return redirect(url_for("index"))
 
     def clamp_step(step_value) -> int:
         try:
@@ -336,9 +473,6 @@ def register_routes(app: Flask) -> None:
             form_data["hazirlayan"] = data.get("hazirlayan", "").strip()
 
     app.jinja_env.globals.update(
-        PERSONEL_OPTIONS=PERSONEL_OPTIONS,
-        TASERON_OPTIONS=TASERON_OPTIONS,
-        HAZIRLAYAN_OPTIONS=HAZIRLAYAN_OPTIONS,
         FIELD_LABELS=FIELD_LABELS,
         datetime=datetime,
     )
