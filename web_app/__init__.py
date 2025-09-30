@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from flask import (Flask, flash, redirect, render_template, request, send_file,
                    session, url_for)
@@ -17,7 +17,7 @@ BASE_PATH = Path(__file__).resolve().parents[1]
 DATA_FILE = BASE_PATH / "data.json"
 DEFAULT_FORM_VALUES: Dict[str, str] = {
     "dok_no": "F-001",
-    "rev_no": "",
+    "rev_no": "00 / 06.05.24",
     "avans": "",
     "taseron": "",
     "gorev_tanimi": "",
@@ -93,7 +93,14 @@ DEFAULT_DYNAMIC_DATA: Dict[str, List[str]] = {
     ],
 }
 
+DEFAULT_FORM_DEFAULTS: Dict[str, str] = {
+    "dok_no": "F-001",
+    "rev_no": "00 / 06.05.24",
+}
+
+_storage: Dict[str, Any] | None = None
 _dynamic_data: Dict[str, List[str]] | None = None
+_form_defaults: Dict[str, str] | None = None
 ADMIN_PASSWORD = os.environ.get("ADMIN_PANEL_PASSWORD") or os.environ.get("ADMIN_PASSWORD") or "delta-admin"
 
 FORM_STEPS: List[Dict[str, str]] = [
@@ -124,26 +131,51 @@ def normalize_options(values) -> List[str]:
     return normalized
 
 
-def load_dynamic_data() -> Dict[str, List[str]]:
-    data = {key: list(value) for key, value in DEFAULT_DYNAMIC_DATA.items()}
+def load_storage() -> Dict[str, Any]:
     if not DATA_FILE.exists():
-        return data
+        return {}
     try:
         with DATA_FILE.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
     except (OSError, json.JSONDecodeError):
-        return data
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload
 
+
+def save_storage(payload: Dict[str, Any]) -> None:
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with DATA_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+
+
+def get_storage() -> Dict[str, Any]:
+    global _storage
+    if _storage is None:
+        _storage = load_storage()
+    return _storage
+
+
+def set_storage(payload: Dict[str, Any]) -> None:
+    global _storage
+    _storage = payload
+    save_storage(payload)
+
+
+def load_dynamic_data() -> Dict[str, List[str]]:
+    storage = get_storage()
+    data = {key: list(value) for key, value in DEFAULT_DYNAMIC_DATA.items()}
     for key, default_values in DEFAULT_DYNAMIC_DATA.items():
-        values = normalize_options(payload.get(key, default_values))
+        values = normalize_options(storage.get(key, default_values))
         data[key] = values or list(default_values)
     return data
 
 
 def save_dynamic_data(data: Dict[str, List[str]]) -> None:
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with DATA_FILE.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
+    storage = get_storage().copy()
+    storage.update(data)
+    set_storage(storage)
 
 
 def get_dynamic_data() -> Dict[str, List[str]]:
@@ -160,6 +192,45 @@ def set_dynamic_data(data: Dict[str, List[str]]) -> None:
         normalized[key] = normalize_options(data.get(key, default_values)) or list(default_values)
     _dynamic_data = normalized
     save_dynamic_data(normalized)
+
+
+def load_form_defaults() -> Dict[str, str]:
+    storage = get_storage()
+    stored = storage.get("form_defaults", {})
+    defaults: Dict[str, str] = {}
+    for key, fallback in DEFAULT_FORM_DEFAULTS.items():
+        value = stored.get(key)
+        if isinstance(value, str) and value.strip():
+            defaults[key] = value.strip()
+        else:
+            defaults[key] = fallback
+    return defaults
+
+
+def save_form_defaults(defaults: Dict[str, str]) -> None:
+    storage = get_storage().copy()
+    storage["form_defaults"] = defaults
+    set_storage(storage)
+
+
+def get_form_defaults() -> Dict[str, str]:
+    global _form_defaults
+    if _form_defaults is None:
+        _form_defaults = load_form_defaults()
+    return _form_defaults
+
+
+def set_form_defaults(defaults: Dict[str, str]) -> None:
+    global _form_defaults
+    cleaned: Dict[str, str] = {}
+    for key, fallback in DEFAULT_FORM_DEFAULTS.items():
+        value = defaults.get(key, "")
+        if not isinstance(value, str):
+            value = str(value or "")
+        value = value.strip()
+        cleaned[key] = value or fallback
+    _form_defaults = cleaned
+    save_form_defaults(cleaned)
 
 
 def create_app() -> Flask:
@@ -289,10 +360,13 @@ def register_routes(app: Flask) -> None:
             flash(str(exc), "error")
             return redirect(url_for("index"))
 
+        form_defaults = get_form_defaults()
         form_data = {
             **DEFAULT_FORM_VALUES,
             "form_no": form_no,
             "tarih": datetime.now().strftime("%d.%m.%Y"),
+            "dok_no": form_defaults["dok_no"],
+            "rev_no": form_defaults["rev_no"],
         }
         store_form_in_session(form_no, form_data)
         flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
@@ -406,7 +480,8 @@ def register_routes(app: Flask) -> None:
             return render_template("admin_login.html")
 
         dynamic_data = get_dynamic_data()
-        return render_template("admin.html", data=dynamic_data)
+        form_defaults = get_form_defaults()
+        return render_template("admin.html", data=dynamic_data, form_defaults=form_defaults)
 
     @app.post("/admin/update")
     def admin_update():
@@ -422,6 +497,13 @@ def register_routes(app: Flask) -> None:
             updated_data[key] = [line for line in lines if line]
 
         set_dynamic_data(updated_data)
+
+        set_form_defaults(
+            {
+                "dok_no": request.form.get("default_dok_no", ""),
+                "rev_no": request.form.get("default_rev_no", ""),
+            }
+        )
         flash("Veri listeleri güncellendi.", "success")
         return redirect(url_for("admin_panel"))
 
@@ -447,6 +529,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_panel"))
 
         set_dynamic_data({key: payload.get(key, []) for key in DEFAULT_DYNAMIC_DATA})
+
+        defaults_payload = payload.get("form_defaults", {})
+        if isinstance(defaults_payload, dict):
+            set_form_defaults(defaults_payload)
+        else:
+            set_form_defaults({})
         flash("Yeni JSON dosyası yüklendi.", "success")
         return redirect(url_for("admin_panel"))
 
