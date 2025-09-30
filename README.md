@@ -60,14 +60,14 @@ pytest
 ## Render (ve benzeri platformlarda) Yayınlama
 
 Render gibi barındırma platformları uygulamanın `0.0.0.0` adresine bağlanmasını
-ve kendilerinin tanımladığı `PORT` ortam değişkenini dinlemesini bekler. Bu
-proje için başlangıç komutunu aşağıdaki gibi tanımlayabilirsiniz:
+ve kendilerinin tanımladığı `PORT` ortam değişkenini dinlemesini bekler. Render
+dashboard'ında **Start Command** alanına aşağıdaki komutu yazdığınızdan emin olun:
 
 ```bash
 python -m web_app
 ```
 
-Komut, `web_app` paketindeki yeni komut satırı giriş noktasını kullanarak Flask
+Bu komut, `web_app` paketindeki yeni komut satırı giriş noktasını kullanarak Flask
 uygulamasını doğru host ve port ayarlarıyla başlatır. Geliştirme ortamında da
 aynı komutu kullanabilirsiniz; `FLASK_DEBUG=1` gibi bir değişken tanımladığınızda
 otomatik olarak debug modu açılır.
