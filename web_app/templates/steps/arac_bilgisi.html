@@ -18,7 +18,16 @@
     <input type="hidden" name="action" value="next">
     <div class="form-row">
         <label for="arac_plaka">Araç Plaka No</label>
-        <input id="arac_plaka" name="arac_plaka" type="text" value="{{ form_data.get('arac_plaka', '') }}" placeholder="34 ABC 123">
+        {% set current_value = form_data.get('arac_plaka', '') %}
+        <select id="arac_plaka" name="arac_plaka">
+            <option value="">Bir araç seçin</option>
+            {% for option in arac_plaka_options %}
+                <option value="{{ option }}" {{ 'selected' if option == current_value else '' }}>{{ option }}</option>
+            {% endfor %}
+            {% if current_value and current_value not in arac_plaka_options %}
+                <option value="{{ current_value }}" selected>{{ current_value }}</option>
+            {% endif %}
+        </select>
     </div>
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>

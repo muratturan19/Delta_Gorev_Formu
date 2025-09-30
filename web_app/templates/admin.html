@@ -17,13 +17,16 @@
         <label for="hazirlayan_options">Hazırlayan / Görevlendiren</label>
         <textarea id="hazirlayan_options" name="hazirlayan_options" rows="6">{{ data.hazirlayan_options | join('\n') }}</textarea>
 
+        <label for="arac_plaka_options">Araç Plaka Listesi</label>
+        <textarea id="arac_plaka_options" name="arac_plaka_options" rows="6">{{ data.arac_plaka_options | join('\n') }}</textarea>
+
         <button type="submit" class="button save">💾 Değişiklikleri Kaydet</button>
     </form>
 </section>
 
 <section class="form-card">
     <h3>JSON Dosyası Yükle</h3>
-    <p>"personel_options", "taseron_options" ve "hazirlayan_options" anahtarlarını içeren bir JSON dosyası yükleyerek verileri toplu olarak güncelleyebilirsiniz.</p>
+    <p>"personel_options", "taseron_options", "hazirlayan_options" ve "arac_plaka_options" anahtarlarını içeren bir JSON dosyası yükleyerek verileri toplu olarak güncelleyebilirsiniz.</p>
     <form method="post" action="{{ url_for('admin_upload') }}" enctype="multipart/form-data" class="stacked">
         <input type="file" name="data_file" accept="application/json" required>
         <button type="submit" class="button secondary">📁 Dosyayı Yükle</button>
