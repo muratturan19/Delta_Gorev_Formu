@@ -85,6 +85,14 @@ HAZIRLAYAN_OPTIONS: List[str] = [
     "Elif Kaya",
 ]
 
+ARAC_PLAKA_OPTIONS: List[str] = [
+    "34 ABC 123",
+    "06 DEF 456",
+    "41 GHI 789",
+    "16 JKL 012",
+    "35 MNO 345",
+]
+
 FORM_STEPS: List[Dict[str, str]] = [
     {"id": "form_bilgileri", "title": "Form Bilgileri", "template": "steps/form_bilgileri.html"},
     {"id": "gorevli_personel", "title": "Görevli Personel", "template": "steps/gorevli_personel.html"},
@@ -205,6 +213,7 @@ def register_routes(app: Flask) -> None:
             personel_options=PERSONEL_OPTIONS,
             taseron_options=TASERON_OPTIONS,
             hazirlayan_options=HAZIRLAYAN_OPTIONS,
+            arac_plaka_options=ARAC_PLAKA_OPTIONS,
         )
 
     @app.route("/form/<form_no>/summary", methods=["GET", "POST"])
@@ -339,6 +348,7 @@ def register_routes(app: Flask) -> None:
         PERSONEL_OPTIONS=PERSONEL_OPTIONS,
         TASERON_OPTIONS=TASERON_OPTIONS,
         HAZIRLAYAN_OPTIONS=HAZIRLAYAN_OPTIONS,
+        ARAC_PLAKA_OPTIONS=ARAC_PLAKA_OPTIONS,
         FIELD_LABELS=FIELD_LABELS,
         datetime=datetime,
     )

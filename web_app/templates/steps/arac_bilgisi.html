@@ -18,7 +18,12 @@
     <input type="hidden" name="action" value="next">
     <div class="form-row">
         <label for="arac_plaka">Araç Plaka No</label>
-        <input id="arac_plaka" name="arac_plaka" type="text" value="{{ form_data.get('arac_plaka', '') }}" placeholder="34 ABC 123">
+        <select id="arac_plaka" name="arac_plaka">
+            <option value="">Araç seçin...</option>
+            {% for plate in arac_plaka_options %}
+                <option value="{{ plate }}" {{ 'selected' if form_data.get('arac_plaka') == plate else '' }}>{{ plate }}</option>
+            {% endfor %}
+        </select>
     </div>
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
