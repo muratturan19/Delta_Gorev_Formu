@@ -1,49 +1,57 @@
 # Delta Görev Formu Sistemi
 
-Delta Proje ekibinin saha görevlerini planlayıp kaydetmesini sağlayan modern bir masaüstü uygulaması. Tkinter ile geliştirilen arayüz, görev formunu adım adım doldurmanıza yardımcı olur ve verileri şirket formatına uygun Excel dosyalarına aktarır.
+Delta Proje ekibinin saha görevlerini planlayıp kaydetmesini sağlayan Flask tabanlı bir web uygulaması.
+Çok adımlı form sihirbazı sayesinde görev bilgilerini, personel listelerini, taşeron ve maliyet
+bilgilerini düzenleyip şirket formatına uygun Excel dosyalarına aktarabilirsiniz.
 
-## Son Güncellemeler
-- **Çok adımlı sihirbaz:** Form bilgileri, personel listesi, avans ve taşeron detayları, görev tanımı, görev yeri, zaman çizelgesi, araç ve hazırlayan adımları tek tek takip ediliyor. Her adımda veriler güncellenip sonraki adıma aktarılıyor.
-- **Zengin özet ekranı:** Kaydedilmeden önce tüm veriler, görev durumu ile birlikte renkli ve yazdırmaya hazır bir tabloda gösteriliyor.
-- **Durum kontrolü:** Gidiş/dönüş ve çalışma saatleri tamamlanmadan form "YARIM" olarak işaretleniyor; eksiksiz doldurulduğunda "TAMAMLANDI" durumuna geçiyor.
-- **Dosya numaralandırması:** `form_config.json` dosyası üzerinden form numarası otomatik artırılıyor. Excel çıktıları `gorev_formu_XXXXX.xlsx` adıyla saklanıyor.
-- **Kısmi kaydetme desteği:** Görev sahada devam ederken formlar "Görev Formu Çağır" seçeneğiyle tekrar açılıp tamamlanabiliyor.
+## Öne Çıkan Özellikler
+- **Web tabanlı arayüz:** Tüm form adımlarını tarayıcı üzerinden takip edin, dilediğiniz adımda
+geri dönüp verileri güncelleyin.
+- **Dinamik özet ekranı:** Kaydetmeden önce formun son durumunu ve eksik alanları tek ekranda kontrol edin.
+- **Durum takibi:** Zaman bilgileri tamamlanmamış formlar "YARIM" olarak işaretlenir; bütün alanlar
+başarıyla doldurulduğunda durum "TAMAMLANDI" olur.
+- **Excel çıktısı:** Her kayıt `gorev_formu_XXXXX.xlsx` formatında saklanır, numaralandırma otomatik yönetilir.
 
 ## Proje Yapısı
 ```
-core/                # Form verilerini işleyen servis katmanı
-  form_service.py    # Excel okuma/yazma, durum hesaplama, numaralandırma
-web_app/             # (Gelecek web sürümü için) başlangıç modülü
-gorev_formu_app.py   # Tkinter arayüzü ve çok adımlı form sihirbazı
-ss                   # Test amaçlı dosya (örnek içerik)
+core/                # Form verilerini işleyen servis katmanı (Excel, durum hesaplama, numaralandırma)
+web_app/             # Flask uygulaması, rotalar ve Jinja şablonları
+  static/            # Stil dosyaları, görseller
+  templates/         # Çok adımlı form ve özet ekranı şablonları
+gorev_formu_app.py   # Tkinter tabanlı eski istemci (artık varsayılan değil)
+ss/                  # Örnek Excel dosyası
+requirements.txt     # Uygulamanın bağımlılık listesi
 tests/               # Pytest senaryoları
 ```
 
 ## Kurulum
 1. Python 3.10 veya üzeri bir sürüm kurulu olduğundan emin olun.
-2. Gerekli paketleri yükleyin:
+2. (Önerilir) Sanal ortam oluşturup etkinleştirin.
+3. Bağımlılıkları yükleyin:
    ```bash
-   pip install -U tkcalendar openpyxl pytest
+   pip install -r requirements.txt
    ```
 
-## Çalıştırma
-```bash
-python gorev_formu_app.py
-```
+## Web Uygulamasını Çalıştırma
+1. Proje klasöründe aşağıdaki komutla geliştirme sunucusunu başlatın:
+   ```bash
+   flask --app web_app run --debug
+   ```
+   Alternatif olarak `python -m flask --app web_app run` kullanabilirsiniz.
+2. Tarayıcınızda [http://localhost:5000](http://localhost:5000) adresine gidin.
+3. Ana ekrandan yeni form başlatabilir veya mevcut bir form numarasını girerek düzenlemeye devam edebilirsiniz.
 
-Uygulama ilk açılışta ana menüyü gösterir:
-1. **Yeni Görev Oluştur:** Yeni bir form numarası üretir ve adım adım doldurmanızı sağlar.
-2. **Görev Formu Çağır:** Daha önce kaydettiğiniz bir Excel dosyasını seçip düzenlemeye devam edebilirsiniz.
+> Varsayılan olarak oturum verileri Flask'in yerleşik imzalı çerez mekanizmasıyla yönetilir.
+> Kalıcı bir gizli anahtar tanımlamak için `FLASK_SECRET_KEY` ortam değişkenini ayarlayabilirsiniz.
 
-Form kaydedildiğinde Excel dosyası mevcut klasöre kaydedilir. `form_config.json` dosyasını silmek, numaralandırmayı sıfırlar (bir dahaki kaydetmede yeniden oluşturulur).
+## Form Dosyaları
+- Kayıtlı formlar proje kökünde `gorev_formu_XXXXX.xlsx` adıyla oluşur.
+- Numara sıralaması `form_config.json` dosyasından takip edilir; dosyayı silmek numaralandırmayı sıfırlar
+  (bir sonraki kayıtta otomatik yeniden oluşturulur).
 
 ## Testler
-Pytest senaryoları servis katmanının tamamlanma durumunu, numaralandırmayı ve Excel kaydını doğrular. Testleri çalıştırmak için:
+Servis katmanının tamamlanma durumunu, numaralandırmayı ve Excel kaydını doğrulamak için pytest
+senaryoları mevcuttur. Testleri çalıştırmak için:
 ```bash
 pytest
 ```
-
-## İpuçları
-- "Kaydet" butonu her adımda mevcut verileri saklar; özet ekranında **Kaydet** derseniz formu tamamlanmış olarak kaydedersiniz.
-- Tarih alanlarında takvim, saat alanlarında ise saat/dakika seçim kutuları bulunur; boş bırakılan kritik alanlar form durumunu "YARIM" yapar.
-- Excel dosyaları başka bir klasöre taşınacaksa uygulamayı o klasörde çalıştırmanız yeterlidir.
