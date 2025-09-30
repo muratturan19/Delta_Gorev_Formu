@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import glob
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from flask import (Flask, flash, redirect, render_template, request, session,
-                   url_for)
+from flask import (Flask, flash, redirect, render_template, request, send_file,
+                   session, url_for)
 
 from core import form_service
 from core.form_service import FormServiceError
@@ -232,12 +231,33 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/")
     def index():
-        excel_files = glob.glob(str(BASE_PATH / "gorev_formu_*.xlsx"))
-        form_numbers = sorted(
-            [Path(file).stem.replace("gorev_formu_", "") for file in excel_files],
-            reverse=True,
+        form_numbers = form_service.list_form_numbers(base_path=str(BASE_PATH))
+
+        filters = {
+            "personel": request.args.get("personel", "").strip(),
+            "gorev_yeri": request.args.get("gorev_yeri", "").strip(),
+            "start_date": request.args.get("start_date", "").strip(),
+            "end_date": request.args.get("end_date", "").strip(),
+        }
+
+        performed_search = any(filters.values())
+        search_results = []
+        if performed_search:
+            search_results = form_service.search_forms(
+                person=filters["personel"],
+                location=filters["gorev_yeri"],
+                start_date=filters["start_date"],
+                end_date=filters["end_date"],
+                base_path=str(BASE_PATH),
+            )
+
+        return render_template(
+            "home.html",
+            form_numbers=form_numbers,
+            search_filters=filters,
+            search_results=search_results,
+            performed_search=performed_search,
         )
-        return render_template("home.html", form_numbers=form_numbers)
 
     @app.post("/form/load")
     def load_form_redirect():
@@ -302,13 +322,13 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("form_wizard", form_no=form_no, step=previous_step))
             if action == "save":
                 try:
-                    filename, status = form_service.save_form(form_no, form_data, base_path=str(BASE_PATH))
+                    _, status = form_service.save_form(form_no, form_data, base_path=str(BASE_PATH))
                 except FormServiceError as exc:
                     flash(str(exc), "error")
                 else:
                     form_data["durum"] = status.code
                     store_form_in_session(form_no, form_data)
-                    flash(f"Form {status.code} olarak kaydedildi. Dosya: {filename}", "success")
+                    flash(f"Form {status.code} olarak veritabanına kaydedildi.", "success")
                 return redirect(url_for("form_wizard", form_no=form_no, step=step))
 
             next_step = step + 1
@@ -348,13 +368,13 @@ def register_routes(app: Flask) -> None:
             action = request.form.get("action")
             if action == "save":
                 try:
-                    filename, status = form_service.save_form(form_no, form_data, base_path=str(BASE_PATH))
+                    _, status = form_service.save_form(form_no, form_data, base_path=str(BASE_PATH))
                 except FormServiceError as exc:
                     flash(str(exc), "error")
                 else:
                     form_data["durum"] = status.code
                     store_form_in_session(form_no, form_data)
-                    flash(f"Form {status.code} olarak kaydedildi. Dosya: {filename}", "success")
+                    flash(f"Form {status.code} olarak veritabanına kaydedildi.", "success")
                 return redirect(url_for("form_summary", form_no=form_no))
             if action == "previous":
                 return redirect(url_for("form_wizard", form_no=form_no, step=total_steps - 1))
@@ -435,6 +455,38 @@ def register_routes(app: Flask) -> None:
         session.pop("is_admin", None)
         flash("Admin oturumu kapatıldı.", "info")
         return redirect(url_for("index"))
+
+    @app.get("/form/<form_no>/export/excel")
+    def export_form_excel(form_no: str):
+        form_data = ensure_form_data(form_no)
+        if form_data is None:
+            flash(f"Form {form_no} bulunamadı.", "error")
+            return redirect(url_for("index"))
+
+        stream = form_service.export_form_to_excel(form_no, form_data)
+        filename = f"gorev_formu_{form_no}.xlsx"
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    @app.get("/form/<form_no>/export/pdf")
+    def export_form_pdf(form_no: str):
+        form_data = ensure_form_data(form_no)
+        if form_data is None:
+            flash(f"Form {form_no} bulunamadı.", "error")
+            return redirect(url_for("index"))
+
+        stream = form_service.export_form_to_pdf(form_no, form_data)
+        filename = f"gorev_formu_{form_no}.pdf"
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/pdf",
+        )
 
     def clamp_step(step_value) -> int:
         try:
