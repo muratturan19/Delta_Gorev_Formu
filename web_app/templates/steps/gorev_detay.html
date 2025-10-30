@@ -25,6 +25,20 @@
             <label for="gorev_yeri">Görev Yeri</label>
             <textarea id="gorev_yeri" name="gorev_yeri" rows="6" placeholder="Görev konumu ve saha bilgilerini yazınız">{{ form_data.get('gorev_yeri', '') }}</textarea>
         </div>
+        <div class="grid grid-3">
+            <div class="form-row">
+                <label for="gorev_il">Görev İli <small>(opsiyonel)</small></label>
+                <input id="gorev_il" name="gorev_il" type="text" value="{{ form_data.get('gorev_il', '') }}" placeholder="Örn. İstanbul">
+            </div>
+            <div class="form-row">
+                <label for="gorev_ilce">Görev İlçesi <small>(opsiyonel)</small></label>
+                <input id="gorev_ilce" name="gorev_ilce" type="text" value="{{ form_data.get('gorev_ilce', '') }}" placeholder="Örn. Ataşehir">
+            </div>
+            <div class="form-row">
+                <label for="gorev_firma">Ziyaret Edilen Firma / Lokasyon <small>(opsiyonel)</small></label>
+                <input id="gorev_firma" name="gorev_firma" type="text" value="{{ form_data.get('gorev_firma', '') }}" placeholder="Örn. Delta Proje Şantiyesi">
+            </div>
+        </div>
     </div>
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>

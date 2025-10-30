@@ -27,6 +27,7 @@
                 <a href="{{ url_for('form_wizard', form_no=form_no, step=0) }}">🧾 Form {{ form_no }}</a>
                 <a href="{{ url_for('form_summary', form_no=form_no) }}">📊 Özet</a>
                 {% endif %}
+                <a href="{{ url_for('reports') }}">📈 Raporlama</a>
                 <a href="{{ url_for('admin_panel') }}">🛠️ Admin Paneli</a>
                 {% if is_admin %}
                 <a href="{{ url_for('admin_logout') }}">🚪 Çıkış</a>

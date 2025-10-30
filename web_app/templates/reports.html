@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Raporlama{% endblock %}
+
+{% block content %}
+<div class="report-page">
+    <div class="report-header">
+        <div>
+            <h2>📈 Raporlama Panosu</h2>
+            <p>Seçtiğiniz tarih aralığı için görev ve personel bazlı özetleri inceleyin.</p>
+        </div>
+        <form method="get" class="report-filter-form">
+            <div class="filter-inputs">
+                <label>
+                    <span>Başlangıç</span>
+                    <input type="date" name="start_date" value="{{ selected_start }}">
+                </label>
+                <label>
+                    <span>Bitiş</span>
+                    <input type="date" name="end_date" value="{{ selected_end }}">
+                </label>
+                <button type="submit" class="button primary">Filtrele</button>
+            </div>
+            <div class="quick-filters">
+                {% for key, item in quick_filters.items() %}
+                <a class="button ghost" href="{{ url_for('reports', start_date=item.start, end_date=item.end) }}">{{ item.label }}</a>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+
+    <div class="report-summary-cards">
+        <div class="report-card">
+            <span class="report-card-label">Toplam Form</span>
+            <strong class="report-card-value">{{ report.total_forms }}</strong>
+            <small>{{ report.filters.start_date or '-' }} → {{ report.filters.end_date or '-' }}</small>
+        </div>
+        <div class="report-card">
+            <span class="report-card-label">Görevlendirilen Kişi Sayısı</span>
+            <strong class="report-card-value">{{ report.unique_person_count }}</strong>
+            <small>Kişi bazında toplam görevlendirme: {{ report.person_breakdown|sum(attribute='count') }}</small>
+        </div>
+        <div class="report-card">
+            <span class="report-card-label">Toplam Yol Süresi</span>
+            <strong class="report-card-value">{{ "%.2f"|format(report.travel_hours.total) }} sa</strong>
+            <small>{{ report.travel_hours.samples }} görevden ortalama {{ "%.2f"|format(report.travel_hours.average) }} sa</small>
+        </div>
+        <div class="report-card">
+            <span class="report-card-label">Toplam Çalışma Süresi</span>
+            <strong class="report-card-value">{{ "%.2f"|format(report.work_hours.total) }} sa</strong>
+            <small>{{ report.work_hours.samples }} görevden ortalama {{ "%.2f"|format(report.work_hours.average) }} sa</small>
+        </div>
+    </div>
+
+    <div class="report-grid">
+        <section class="report-section">
+            <header>
+                <h3>👥 Kişi Bazında Görevlendirme Adedi</h3>
+            </header>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Kişi</th>
+                        <th>Görev Sayısı</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if report.person_breakdown %}
+                        {% for item in report.person_breakdown %}
+                        <tr>
+                            <td>{{ item.person }}</td>
+                            <td>{{ item.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="2" class="empty-cell">Kayıt bulunamadı.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="report-section">
+            <header>
+                <h3>📍 Lokasyon / Firma Bazında Görevlendirmeler</h3>
+            </header>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Lokasyon</th>
+                        <th>Görev Sayısı</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if report.locations %}
+                        {% for item in report.locations %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="2" class="empty-cell">Kayıt bulunamadı.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <div class="report-grid single">
+        <section class="report-section">
+            <header>
+                <h3>💸 Görev Bazında Harcama Grafiği</h3>
+                <p>Her form için girilen harcama bildirimi sayısını gösterir.</p>
+            </header>
+            <canvas id="expenseChart" height="220"></canvas>
+        </section>
+    </div>
+
+    <section class="report-section">
+        <header>
+            <h3>🕒 Görev Süreleri</h3>
+            <p>Her görev için yol ve çalışma sürelerinin karşılaştırması.</p>
+        </header>
+        <div class="report-table-wrapper">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Form No</th>
+                        <th>Görev Tanımı</th>
+                        <th>Görev Tarihi</th>
+                        <th>Görevli Personel</th>
+                        <th>Yol Süresi (sa)</th>
+                        <th>Çalışma Süresi (sa)</th>
+                        <th>Harcama Bildirimi</th>
+                        <th>Lokasyon</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if report.forms %}
+                        {% for form in report.forms %}
+                        <tr>
+                            <td>{{ form.form_no }}</td>
+                            <td>{{ form.gorev_tanimi or '-' }}</td>
+                            <td>{{ form.gorev_tarih or '-' }}</td>
+                            <td>
+                                {% if form.personel %}
+                                    <ul class="inline-list">
+                                        {% for person in form.personel %}
+                                        <li>{{ person }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ form.travel_hours if form.travel_hours is not none else '-' }}</td>
+                            <td>{{ form.work_hours if form.work_hours is not none else '-' }}</td>
+                            <td>{{ form.expense_count }}</td>
+                            <td>
+                                {% if form.gorev_il or form.gorev_ilce or form.gorev_firma %}
+                                    {{ [form.gorev_il, form.gorev_ilce, form.gorev_firma] | select | list | join(', ') }}
+                                {% else %}
+                                    {{ form.gorev_yeri or '-' }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="empty-cell">Seçilen tarih aralığı için görev bulunamadı.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-nCfpnRfpBefD31z9rbvJNdaI6pI++DhfSb9VInA36TObgATJE0nN8tBCZ6irda5x" crossorigin="anonymous"></script>
+<script>
+    const expenseCtx = document.getElementById('expenseChart');
+    if (expenseCtx) {
+        const expenseLabels = {{ report.expense_chart['labels'] | tojson }};
+        const expenseValues = {{ report.expense_chart['values'] | tojson }};
+        new Chart(expenseCtx, {
+            type: 'bar',
+            data: {
+                labels: expenseLabels,
+                datasets: [{
+                    label: 'Harcama bildirimi adedi',
+                    data: expenseValues,
+                    backgroundColor: 'rgba(13, 71, 161, 0.6)',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            autoSkip: false,
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

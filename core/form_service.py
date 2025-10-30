@@ -75,6 +75,9 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             gorev_tanimi TEXT,
             gorev_yeri TEXT,
             gorev_yeri_lower TEXT,
+            gorev_il TEXT,
+            gorev_ilce TEXT,
+            gorev_firma TEXT,
             gorev_tarih TEXT,
             gorev_tarih_iso TEXT,
             yapilan_isler TEXT,
@@ -136,6 +139,9 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
         ("gorev_tarih", "TEXT"),
         ("gorev_tarih_iso", "TEXT"),
         ("last_step", "INTEGER DEFAULT 0"),
+        ("gorev_il", "TEXT"),
+        ("gorev_ilce", "TEXT"),
+        ("gorev_firma", "TEXT"),
     ):
         if column not in existing_columns:
             connection.execute(f"ALTER TABLE forms ADD COLUMN {column} {definition}")
@@ -202,6 +208,9 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     payload["gorev_tanimi"] = (form_data.get("gorev_tanimi") or "").strip()
     payload["gorev_yeri"] = gorev_yeri
     payload["gorev_yeri_lower"] = _normalize_for_search(gorev_yeri)
+    payload["gorev_il"] = (form_data.get("gorev_il") or "").strip()
+    payload["gorev_ilce"] = (form_data.get("gorev_ilce") or "").strip()
+    payload["gorev_firma"] = (form_data.get("gorev_firma") or "").strip()
     gorev_tarih = (form_data.get("gorev_tarih") or "").strip()
     payload["gorev_tarih"] = gorev_tarih
     payload["gorev_tarih_iso"] = _to_iso_date(gorev_tarih)
@@ -372,6 +381,9 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
         "taseron": row["taseron"] or "",
         "gorev_tanimi": row["gorev_tanimi"] or "",
         "gorev_yeri": row["gorev_yeri"] or "",
+        "gorev_il": row["gorev_il"] or "",
+        "gorev_ilce": row["gorev_ilce"] or "",
+        "gorev_firma": row["gorev_firma"] or "",
         "gorev_tarih": row["gorev_tarih"] or "",
         "yapilan_isler": row["yapilan_isler"] or "",
         "arac_plaka": row["arac_plaka"] or "",
@@ -548,6 +560,220 @@ def search_forms(
     return results
 
 
+def get_reporting_summary(
+    *,
+    start_date: str = "",
+    end_date: str = "",
+    base_path: str = ".",
+) -> Dict[str, Any]:
+    """Derlenmiş raporlama metriklerini döndür."""
+
+    start_iso = _to_iso_date(start_date)
+    end_iso = _to_iso_date(end_date)
+
+    filters: List[str] = []
+    params: List[Any] = []
+
+    if start_iso:
+        filters.append(
+            "COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso) IS NOT NULL "
+            "AND COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso) >= ?"
+        )
+        params.append(start_iso)
+
+    if end_iso:
+        filters.append(
+            "COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso) IS NOT NULL "
+            "AND COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso) <= ?"
+        )
+        params.append(end_iso)
+
+    where_clause = ""
+    if filters:
+        where_clause = " WHERE " + " AND ".join(filters)
+
+    columns = [
+        "form_no",
+        "gorev_tanimi",
+        "avans",
+        "harcama_bildirimleri",
+        "yola_cikis_tarih",
+        "yola_cikis_tarih_iso",
+        "yola_cikis_saat",
+        "donus_tarih",
+        "donus_tarih_iso",
+        "donus_saat",
+        "calisma_baslangic_tarih",
+        "calisma_baslangic_tarih_iso",
+        "calisma_baslangic_saat",
+        "calisma_bitis_tarih",
+        "calisma_bitis_tarih_iso",
+        "calisma_bitis_saat",
+        "gorev_yeri",
+        "gorev_il",
+        "gorev_ilce",
+        "gorev_firma",
+        "gorev_tarih",
+        "gorev_tarih_iso",
+    ]
+    columns.extend(PERSONEL_FIELDS)
+
+    query = (
+        "SELECT "
+        + ", ".join(columns)
+        + " FROM forms"
+        + where_clause
+        + " ORDER BY COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso, '') DESC, CAST(form_no AS INTEGER) DESC"
+    )
+
+    with _connect(base_path) as connection:
+        rows = connection.execute(query, tuple(params)).fetchall()
+
+    def _combine_datetime(row: sqlite3.Row, date_key: str, iso_key: str, time_key: str) -> datetime | None:
+        date_iso = row[iso_key] or None
+        if not date_iso:
+            date_iso = _to_iso_date(row[date_key])
+        if not date_iso:
+            return None
+        time_value = (row[time_key] or "").strip()
+        if not time_value:
+            time_value = "00:00"
+        if len(time_value.split(":")) == 2:
+            time_value = f"{time_value}:00"
+        try:
+            return datetime.fromisoformat(f"{date_iso}T{time_value}")
+        except ValueError:
+            return None
+
+    person_counts: Dict[str, int] = {}
+    unique_people: set[str] = set()
+    total_travel_hours = 0.0
+    total_work_hours = 0.0
+    travel_samples = 0
+    work_samples = 0
+    expense_labels: List[str] = []
+    expense_values: List[float] = []
+    location_counter: Dict[Tuple[str, str, str], int] = {}
+    forms_summary: List[Dict[str, Any]] = []
+
+    for row in rows:
+        personel = [row[field] for field in PERSONEL_FIELDS if row[field]]
+        for person in personel:
+            normalized = person.strip()
+            if not normalized:
+                continue
+            person_counts[normalized] = person_counts.get(normalized, 0) + 1
+            unique_people.add(normalized)
+
+        start_dt = _combine_datetime(row, "yola_cikis_tarih", "yola_cikis_tarih_iso", "yola_cikis_saat")
+        end_dt = _combine_datetime(row, "donus_tarih", "donus_tarih_iso", "donus_saat")
+        travel_hours = None
+        if start_dt and end_dt and end_dt >= start_dt:
+            delta = end_dt - start_dt
+            travel_hours = round(delta.total_seconds() / 3600, 2)
+            total_travel_hours += travel_hours
+            travel_samples += 1
+
+        work_start = _combine_datetime(
+            row,
+            "calisma_baslangic_tarih",
+            "calisma_baslangic_tarih_iso",
+            "calisma_baslangic_saat",
+        )
+        work_end = _combine_datetime(
+            row,
+            "calisma_bitis_tarih",
+            "calisma_bitis_tarih_iso",
+            "calisma_bitis_saat",
+        )
+        work_hours = None
+        if work_start and work_end and work_end >= work_start:
+            delta = work_end - work_start
+            work_hours = round(delta.total_seconds() / 3600, 2)
+            total_work_hours += work_hours
+            work_samples += 1
+
+        expenses_raw = row["harcama_bildirimleri"] or "[]"
+        try:
+            expenses = json.loads(expenses_raw)
+        except (TypeError, json.JSONDecodeError):
+            expenses = []
+        if not isinstance(expenses, list):
+            expenses = []
+        expense_count = len(expenses)
+        expense_labels.append(row["form_no"])
+        expense_values.append(float(expense_count))
+
+        location_key = (
+            (row["gorev_il"] or "").strip(),
+            (row["gorev_ilce"] or "").strip(),
+            (row["gorev_firma"] or "").strip(),
+        )
+        if not any(location_key):
+            location_key = ((row["gorev_yeri"] or "Belirtilmedi").strip(), "", "")
+        location_counter[location_key] = location_counter.get(location_key, 0) + 1
+
+        forms_summary.append(
+            {
+                "form_no": row["form_no"],
+                "gorev_tanimi": row["gorev_tanimi"] or "",
+                "personel": personel,
+                "travel_hours": travel_hours,
+                "work_hours": work_hours,
+                "expense_count": expense_count,
+                "gorev_il": row["gorev_il"] or "",
+                "gorev_ilce": row["gorev_ilce"] or "",
+                "gorev_firma": row["gorev_firma"] or "",
+                "gorev_yeri": row["gorev_yeri"] or "",
+                "gorev_tarih": row["gorev_tarih"] or "",
+            }
+        )
+
+    sorted_persons = sorted(person_counts.items(), key=lambda item: (-item[1], item[0]))
+    person_breakdown = [
+        {"person": name, "count": count}
+        for name, count in sorted_persons
+    ]
+
+    sorted_locations = sorted(
+        location_counter.items(),
+        key=lambda item: (-item[1], item[0]),
+    )
+    location_breakdown = [
+        {
+            "label": ", ".join(filter(None, key)).strip() or "Belirtilmedi",
+            "count": count,
+        }
+        for key, count in sorted_locations
+    ]
+
+    return {
+        "total_forms": len(forms_summary),
+        "unique_person_count": len(unique_people),
+        "person_breakdown": person_breakdown,
+        "forms": forms_summary,
+        "travel_hours": {
+            "total": round(total_travel_hours, 2),
+            "average": round(total_travel_hours / travel_samples, 2) if travel_samples else 0.0,
+            "samples": travel_samples,
+        },
+        "work_hours": {
+            "total": round(total_work_hours, 2),
+            "average": round(total_work_hours / work_samples, 2) if work_samples else 0.0,
+            "samples": work_samples,
+        },
+        "expense_chart": {
+            "labels": expense_labels,
+            "values": expense_values,
+        },
+        "locations": location_breakdown,
+        "filters": {
+            "start_date": start_iso or "",
+            "end_date": end_iso or "",
+        },
+    }
+
+
 def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormStatus) -> Workbook:
     workbook = Workbook()
     worksheet = workbook.active
@@ -647,6 +873,9 @@ def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormS
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
+        ("Görev İli", form_data.get("gorev_il", "")),
+        ("Görev İlçesi", form_data.get("gorev_ilce", "")),
+        ("Firma/Lokasyon", form_data.get("gorev_firma", "")),
         ("Yapılan İşler", yapilan_isler),
         ("Harcama Bildirimleri", expenses_text),
         ("Ekler", attachments_text),
@@ -782,6 +1011,9 @@ def export_form_to_pdf(
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
+        ("Görev İli", form_data.get("gorev_il", "")),
+        ("Görev İlçesi", form_data.get("gorev_ilce", "")),
+        ("Firma/Lokasyon", form_data.get("gorev_firma", "")),
         ("Yapılan İşler", yapilan_isler),
         ("Harcama Bildirimleri", expenses_text),
         ("Ekler", attachments_text),
@@ -834,6 +1066,7 @@ __all__ = [
     "export_form_to_pdf",
     "get_db_path",
     "get_next_form_no",
+    "get_reporting_summary",
     "list_form_numbers",
     "load_form_data",
     "save_form",

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
 from uuid import uuid4
@@ -24,6 +24,9 @@ DEFAULT_FORM_VALUES: Dict[str, Any] = {
     "taseron": "",
     "gorev_tanimi": "",
     "gorev_yeri": "",
+    "gorev_il": "",
+    "gorev_ilce": "",
+    "gorev_firma": "",
     "yapilan_isler": "",
     "yola_cikis_tarih": "",
     "yola_cikis_saat": "",
@@ -50,6 +53,9 @@ FIELD_LABELS: Dict[str, str] = {
     "taseron": "Taşeron Şirket",
     "gorev_tanimi": "Görevin Tanımı",
     "gorev_yeri": "Görev Yeri",
+    "gorev_il": "Görev İli",
+    "gorev_ilce": "Görev İlçesi",
+    "gorev_firma": "Görev/Firma",
     "yola_cikis_tarih": "Yola Çıkış Tarihi",
     "yola_cikis_saat": "Yola Çıkış Saati",
     "donus_tarih": "Dönüş Tarihi",
@@ -409,6 +415,53 @@ def register_routes(app: Flask) -> None:
             search_filters=filters,
             search_results=search_results,
             performed_search=performed_search,
+        )
+
+    @app.route("/reports")
+    def reports():
+        selected_start = request.args.get("start_date", "").strip()
+        selected_end = request.args.get("end_date", "").strip()
+
+        today = datetime.utcnow().date()
+        month_start = today.replace(day=1)
+        if month_start.month == 12:
+            next_month = month_start.replace(year=month_start.year + 1, month=1)
+        else:
+            next_month = month_start.replace(month=month_start.month + 1)
+        month_end = next_month - timedelta(days=1)
+
+        year_start = today.replace(month=1, day=1)
+        year_end = year_start.replace(year=year_start.year + 1) - timedelta(days=1)
+
+        if not selected_start and not selected_end:
+            selected_start = month_start.isoformat()
+            selected_end = month_end.isoformat()
+
+        summary = form_service.get_reporting_summary(
+            start_date=selected_start,
+            end_date=selected_end,
+            base_path=str(BASE_PATH),
+        )
+
+        quick_filters = {
+            "month": {
+                "label": "Bu Ay",
+                "start": month_start.isoformat(),
+                "end": month_end.isoformat(),
+            },
+            "year": {
+                "label": "Bu Yıl",
+                "start": year_start.isoformat(),
+                "end": year_end.isoformat(),
+            },
+        }
+
+        return render_template(
+            "reports.html",
+            report=summary,
+            selected_start=selected_start,
+            selected_end=selected_end,
+            quick_filters=quick_filters,
         )
 
     @app.post("/form/load")
@@ -856,6 +909,9 @@ def register_routes(app: Flask) -> None:
         elif step_id == "gorev_detay":
             form_data["gorev_tanimi"] = data.get("gorev_tanimi", "").strip()
             form_data["gorev_yeri"] = data.get("gorev_yeri", "").strip()
+            form_data["gorev_il"] = data.get("gorev_il", "").strip()
+            form_data["gorev_ilce"] = data.get("gorev_ilce", "").strip()
+            form_data["gorev_firma"] = data.get("gorev_firma", "").strip()
         elif step_id == "gorev_bilgileri":
             date_fields = [
                 "yola_cikis_tarih",

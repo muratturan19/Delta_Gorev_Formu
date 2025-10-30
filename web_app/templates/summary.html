@@ -63,6 +63,18 @@
                 <th class="label">Görev Yeri</th>
                 <td colspan="5">{{ form_data.get('gorev_yeri', '') or '-' }}</td>
             </tr>
+            {% if form_data.get('gorev_il') or form_data.get('gorev_ilce') or form_data.get('gorev_firma') %}
+            <tr>
+                <th class="label">Konum Detayı</th>
+                <td colspan="5">
+                    <div class="location-tags">
+                        {% if form_data.get('gorev_il') %}<span class="tag">İl: {{ form_data.get('gorev_il') }}</span>{% endif %}
+                        {% if form_data.get('gorev_ilce') %}<span class="tag">İlçe: {{ form_data.get('gorev_ilce') }}</span>{% endif %}
+                        {% if form_data.get('gorev_firma') %}<span class="tag">Firma/Lokasyon: {{ form_data.get('gorev_firma') }}</span>{% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
             <tr>
                 <th class="label">Yapılan İşler</th>
                 <td colspan="5">{{ form_data.get('yapilan_isler', '') or '-' }}</td>

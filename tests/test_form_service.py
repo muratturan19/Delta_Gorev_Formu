@@ -20,6 +20,9 @@ def sample_form_data():
         "taseron": "ABC",
         "gorev_tanimi": "Bakım",
         "gorev_yeri": "İstanbul",
+        "gorev_il": "İstanbul",
+        "gorev_ilce": "Kadıköy",
+        "gorev_firma": "Delta Proje",
         "gorev_tarih": "05.01.2024",
         "personel_1": "Ali",
         "personel_2": "Veli",
@@ -100,6 +103,9 @@ def test_save_partial_form(tmp_path, sample_form_data):
     stored = _fetch_form(tmp_path, "00042")
     assert stored["durum"] == "YARIM"
     assert stored["gorev_yeri"] == sample_form_data["gorev_yeri"]
+    assert stored["gorev_il"] == sample_form_data["gorev_il"]
+    assert stored["gorev_ilce"] == sample_form_data["gorev_ilce"]
+    assert stored["gorev_firma"] == sample_form_data["gorev_firma"]
     assert stored["last_step"] == 0
 
 
@@ -119,6 +125,9 @@ def test_save_and_load_form(tmp_path, sample_form_data):
 
     loaded = form_service.load_form_data("00077", base_path=str(tmp_path))
     assert loaded["gorev_yeri"] == sample_form_data["gorev_yeri"]
+    assert loaded["gorev_il"] == sample_form_data["gorev_il"]
+    assert loaded["gorev_ilce"] == sample_form_data["gorev_ilce"]
+    assert loaded["gorev_firma"] == sample_form_data["gorev_firma"]
     assert loaded["durum"] == "TAMAMLANDI"
     assert loaded["last_step"] == 4
     assert loaded["gorev_tarih"] == sample_form_data["gorev_tarih"]
@@ -132,10 +141,15 @@ def test_search_forms_filters(tmp_path, sample_form_data):
     other.update(
         {
             "gorev_yeri": "Ankara",
+            "gorev_il": "Ankara",
+            "gorev_ilce": "Çankaya",
+            "gorev_firma": "XYZ Enerji",
             "personel_1": "Mehmet",
             "personel_2": "Ayşe",
             "yola_cikis_tarih": "15.03.2024",
             "donus_tarih": "16.03.2024",
+            "yola_cikis_saat": "07:30",
+            "donus_saat": "18:15",
         }
     )
     form_service.save_form("00002", other, base_path=str(tmp_path))
@@ -159,3 +173,46 @@ def test_search_forms_filters(tmp_path, sample_form_data):
     assert len(ankara_results) == 1
     assert ankara_results[0]["form_no"] == "00002"
     assert "Mehmet" in ankara_results[0]["personel"]
+
+
+def test_get_reporting_summary(tmp_path, sample_form_data):
+    form_service.save_form("00001", sample_form_data, base_path=str(tmp_path))
+
+    second = dict(sample_form_data)
+    second.update(
+        {
+            "gorev_yeri": "Ankara",
+            "gorev_il": "Ankara",
+            "gorev_ilce": "Çankaya",
+            "gorev_firma": "XYZ Enerji",
+            "personel_1": "Mehmet",
+            "personel_2": "Ayşe",
+            "personel_3": "Ali",
+            "yola_cikis_tarih": "15.03.2024",
+            "yola_cikis_saat": "07:30",
+            "donus_tarih": "16.03.2024",
+            "donus_saat": "18:15",
+            "calisma_baslangic_tarih": "15.03.2024",
+            "calisma_baslangic_saat": "09:00",
+            "calisma_bitis_tarih": "16.03.2024",
+            "calisma_bitis_saat": "16:30",
+            "harcama_bildirimleri": [
+                {"description": "Yakıt", "attachments": []},
+                {"description": "Konaklama", "attachments": []},
+            ],
+        }
+    )
+    form_service.save_form("00002", second, base_path=str(tmp_path))
+
+    summary = form_service.get_reporting_summary(
+        start_date="2024-01-01",
+        end_date="2024-12-31",
+        base_path=str(tmp_path),
+    )
+
+    assert summary["total_forms"] == 2
+    assert summary["unique_person_count"] >= 3
+    assert summary["travel_hours"]["total"] > 0
+    assert summary["work_hours"]["total"] > 0
+    assert len(summary["expense_chart"]["labels"]) == 2
+    assert any("Ankara" in item["label"] for item in summary["locations"])
