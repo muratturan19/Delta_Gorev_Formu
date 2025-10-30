@@ -922,6 +922,17 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("form_wizard", form_no=form_no, step=4))
 
         current = get_current_user()
+
+        try:
+            _, status = form_service.save_partial_form(
+                form_no, form_data, base_path=str(BASE_PATH)
+            )
+        except FormServiceError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("form_wizard", form_no=form_no, step=4))
+        else:
+            form_data["durum"] = status.code
+
         assigned_timestamp = form_service.assign_form(
             form_no,
             assigned_to_user_id=employee.id,
