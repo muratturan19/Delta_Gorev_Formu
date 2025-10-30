@@ -39,6 +39,10 @@
                 <th colspan="2">AVANS TUTARI</th>
                 <th colspan="2">TAŞERON ŞİRKET</th>
             </tr>
+            <tr>
+                <th class="label" colspan="2">Görev Tarihi</th>
+                <td colspan="4">{{ form_data.get('gorev_tarih', '') or '-' }}</td>
+            </tr>
             {% for index in range(1, 6) %}
             <tr>
                 <td colspan="2">{{ form_data.get('personel_' ~ index, '') or '-' }}</td>
@@ -63,6 +67,30 @@
                 <th class="label">Yapılan İşler</th>
                 <td colspan="5">{{ form_data.get('yapilan_isler', '') or '-' }}</td>
             </tr>
+            {% if form_data.get('harcama_bildirimleri') %}
+            <tr>
+                <th class="label">Harcama Bildirimleri</th>
+                <td colspan="5">
+                    <ul class="expense-summary-list">
+                        {% for expense in form_data.get('harcama_bildirimleri', []) %}
+                        <li>
+                            <strong>Harcama {{ loop.index }}:</strong>
+                            <span>{{ expense.description or 'Açıklama belirtilmedi' }}</span>
+                            {% if expense.attachments %}
+                            <ul>
+                                {% for receipt in expense.attachments %}
+                                <li>
+                                    <a href="{{ url_for('download_attachment', form_no=form_no, filename=receipt.filename) }}">{{ receipt.original_name }}</a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            {% endif %}
             {% if form_data.get('gorev_ekleri') %}
             <tr>
                 <th class="label">Ekler</th>
