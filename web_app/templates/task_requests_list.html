@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Görev Talepleri · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>📋 Görev Talepleri</h1>
+    <p>Gelen talepleri inceleyin, notlar ekleyin ve uygun olduğunda göreve dönüştürün.</p>
+</section>
+
+<nav class="filter-tabs">
+    {% for option in status_options %}
+    <a class="filter-tab {% if status_filter == option.value %}is-active{% endif %}"
+       href="{{ url_for('task_requests_list', status=option.value) if option.value else url_for('task_requests_list') }}">
+        {{ option.label }}
+    </a>
+    {% endfor %}
+</nav>
+
+<div class="table-wrapper">
+    <table class="task-requests-table">
+        <thead>
+            <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Müşteri</th>
+                <th scope="col">Talep Özeti</th>
+                <th scope="col">Aciliyet</th>
+                <th scope="col">Durum</th>
+                <th scope="col">Oluşturan</th>
+                <th scope="col">Tarih</th>
+                <th scope="col">Aksiyonlar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if task_requests %}
+            {% for request in task_requests %}
+            <tr>
+                <td data-label="ID">{{ request.display_id }}</td>
+                <td data-label="Müşteri">
+                    <div class="customer-info">
+                        <strong>{{ request.customer_name }}</strong>
+                        {% if request.customer_phone %}
+                        <span>{{ request.customer_phone }}</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td data-label="Talep Özeti">{{ request.request_summary or '-' }}</td>
+                <td data-label="Aciliyet">
+                    <span class="badge {{ request.urgency_class }}">{{ request.urgency_label }}</span>
+                </td>
+                <td data-label="Durum">
+                    <span class="badge {{ request.status_class }}">{{ request.status_label }}</span>
+                </td>
+                <td data-label="Oluşturan">{{ request.requested_by_name or '-' }}</td>
+                <td data-label="Tarih">{{ request.created_display or '-' }}</td>
+                <td data-label="Aksiyonlar">
+                    <div class="table-actions">
+                        <button type="button" class="button secondary small" data-open-request data-request='{{ request | tojson }}'>Detay</button>
+                        {% if request.status == 'pending' %}
+                        <a class="button primary small" href="{{ request.convert_url }}">Görev Oluştur</a>
+                        {% elif request.status == 'converted' and request.converted_form_no %}
+                        <a class="button secondary small" href="{{ request.converted_form_url }}">Formu Aç</a>
+                        {% elif request.status == 'converted' %}
+                        <span class="badge status-converted muted">Göreve Dönüştürüldü</span>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td class="empty" colspan="8">Gösterilecek talep bulunamadı.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="task-request-cards">
+    {% if task_requests %}
+    {% for request in task_requests %}
+    <article class="task-request-card" data-request='{{ request | tojson }}'>
+        <header>
+            <div>
+                <span class="request-id">{{ request.display_id }}</span>
+                <h2>{{ request.customer_name }}</h2>
+            </div>
+            <div class="badge-stack">
+                <span class="badge {{ request.urgency_class }}">{{ request.urgency_label }}</span>
+                <span class="badge {{ request.status_class }}">{{ request.status_label }}</span>
+            </div>
+        </header>
+        <dl class="card-details">
+            <div>
+                <dt>Telefon</dt>
+                <dd>{{ request.customer_phone or '-' }}</dd>
+            </div>
+            <div>
+                <dt>Oluşturan</dt>
+                <dd>{{ request.requested_by_name or '-' }}</dd>
+            </div>
+            <div>
+                <dt>Tarih</dt>
+                <dd>{{ request.created_display or '-' }}</dd>
+            </div>
+        </dl>
+        <p class="card-summary">{{ request.request_summary or 'Talep özeti bulunmuyor.' }}</p>
+        <div class="card-actions">
+            <button type="button" class="button secondary small" data-open-request data-request='{{ request | tojson }}'>Detay</button>
+            {% if request.status == 'pending' %}
+            <a class="button primary small" href="{{ request.convert_url }}">Görev Oluştur</a>
+            {% elif request.status == 'converted' and request.converted_form_no %}
+            <a class="button secondary small" href="{{ request.converted_form_url }}">Formu Aç</a>
+            {% elif request.status == 'converted' %}
+            <span class="badge status-converted muted">Göreve Dönüştürüldü</span>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+    {% else %}
+    <p class="empty">Gösterilecek talep bulunamadı.</p>
+    {% endif %}
+</div>
+
+<div class="modal-overlay" id="request-detail-modal">
+    <div class="modal large">
+        <button type="button" class="modal-close" data-close-modal>&times;</button>
+        <header class="modal-header">
+            <div>
+                <h2 data-field="modal-title"></h2>
+                <p data-field="modal-created"></p>
+            </div>
+            <div class="badge-stack">
+                <span class="badge" data-field="modal-urgency"></span>
+                <span class="badge" data-field="modal-status"></span>
+            </div>
+        </header>
+        <div class="modal-body">
+            <dl class="detail-grid">
+                <div>
+                    <dt>Müşteri Adı</dt>
+                    <dd data-field="customer-name"></dd>
+                </div>
+                <div>
+                    <dt>Telefon</dt>
+                    <dd data-field="customer-phone"></dd>
+                </div>
+                <div>
+                    <dt>E-posta</dt>
+                    <dd data-field="customer-email"></dd>
+                </div>
+                <div>
+                    <dt>Adres</dt>
+                    <dd data-field="customer-address"></dd>
+                </div>
+            </dl>
+            <section class="detail-section">
+                <h3>Talep Detayı</h3>
+                <p data-field="request-description"></p>
+            </section>
+            <section class="detail-section" data-field="requirements-section">
+                <h3>Gereklilikler</h3>
+                <p data-field="requirements"></p>
+            </section>
+            <dl class="detail-grid compact">
+                <div>
+                    <dt>Durum</dt>
+                    <dd data-field="status-label"></dd>
+                </div>
+                <div>
+                    <dt>Oluşturan</dt>
+                    <dd data-field="requested-by"></dd>
+                </div>
+                <div>
+                    <dt>Atanan</dt>
+                    <dd data-field="assigned-to"></dd>
+                </div>
+            </dl>
+            <section class="detail-section">
+                <h3>Notlar</h3>
+                <form id="notes-form" method="post">
+                    <input type="hidden" name="action" value="update_notes">
+                    <input type="hidden" name="redirect_status" value="{{ status_filter }}">
+                    <textarea id="notes-input" name="notes" rows="3"></textarea>
+                    <div class="form-actions">
+                        <button type="submit" class="button primary small">Notları Güncelle</button>
+                    </div>
+                </form>
+            </section>
+            <section class="detail-section converted" data-field="converted-info" hidden>
+                <h3>Dönüştürülen Form</h3>
+                <p>
+                    Talep <strong data-field="converted-form-no"></strong> numaralı forma dönüştürüldü.
+                    <a data-field="converted-form-link" href="#">Formu aç</a>
+                </p>
+            </section>
+        </div>
+        <footer class="modal-footer">
+            <form id="status-form" method="post">
+                <input type="hidden" name="action" value="">
+                <input type="hidden" name="status_value" value="">
+                <input type="hidden" name="redirect_status" value="{{ status_filter }}">
+            </form>
+            <div class="modal-actions">
+                <a class="button primary" data-action="convert" href="#" target="_self">Görev Oluştur</a>
+                <button type="button" class="button secondary" data-status="in_progress">İncelemede Olarak İşaretle</button>
+                <button type="button" class="button danger" data-status="rejected">Reddet</button>
+                <button type="button" class="button ghost" data-close-modal>Kapat</button>
+            </div>
+        </footer>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+    const modal = document.getElementById('request-detail-modal');
+    if (!modal) { return; }
+    const notesForm = modal.querySelector('#notes-form');
+    const notesInput = modal.querySelector('#notes-input');
+    const statusForm = modal.querySelector('#status-form');
+    const convertLink = modal.querySelector('[data-action="convert"]');
+    const statusButtons = modal.querySelectorAll('[data-status]');
+    const closeButtons = modal.querySelectorAll('[data-close-modal]');
+    const requirementsSection = modal.querySelector('[data-field="requirements-section"]');
+    const convertedSection = modal.querySelector('[data-field="converted-info"]');
+    const convertedLink = modal.querySelector('[data-field="converted-form-link"]');
+    const convertedNo = modal.querySelector('[data-field="converted-form-no"]');
+
+    function applyBadge(element, label, className) {
+        element.textContent = label || '-';
+        element.className = 'badge ' + (className || '');
+    }
+
+    function setText(field, value) {
+        const target = modal.querySelector('[data-field="' + field + '"]');
+        if (target) {
+            target.textContent = value || '-';
+        }
+    }
+
+    function openModal(data) {
+        if (!data) { return; }
+        modal.classList.add('is-visible');
+        modal.querySelector('[data-field="modal-title"]').textContent = data.display_id + ' · ' + (data.customer_name || '');
+        setText('modal-created', data.created_display || '');
+        setText('customer-name', data.customer_name || '-');
+        setText('customer-phone', data.customer_phone || '-');
+        setText('customer-email', data.customer_email || '-');
+        setText('customer-address', data.customer_address || '-');
+        setText('request-description', data.request_description || '-');
+        setText('requirements', data.requirements || '-');
+        setText('status-label', data.status_label || '-');
+        setText('requested-by', data.requested_by_name || '-');
+        setText('assigned-to', data.assigned_to_name || '-');
+
+        applyBadge(modal.querySelector('[data-field="modal-urgency"]'), data.urgency_label, data.urgency_class);
+        applyBadge(modal.querySelector('[data-field="modal-status"]'), data.status_label, data.status_class);
+
+        if (data.requirements) {
+            requirementsSection.removeAttribute('hidden');
+        } else {
+            requirementsSection.setAttribute('hidden', 'hidden');
+        }
+
+        notesInput.value = data.notes || '';
+        notesForm.action = data.update_url;
+        statusForm.action = data.update_url;
+
+        convertedSection.setAttribute('hidden', 'hidden');
+        if (data.status === 'converted' && data.converted_form_no) {
+            convertedSection.removeAttribute('hidden');
+            convertedNo.textContent = data.converted_form_no;
+            convertedLink.href = data.converted_form_url || '#';
+        }
+
+        if (data.status === 'pending') {
+            convertLink.classList.remove('is-hidden');
+            convertLink.href = data.convert_url;
+        } else {
+            convertLink.classList.add('is-hidden');
+            convertLink.removeAttribute('href');
+        }
+
+        statusButtons.forEach(function(button) {
+            const targetStatus = button.dataset.status;
+            if (targetStatus === 'in_progress') {
+                button.style.display = data.status === 'pending' ? '' : 'none';
+            } else if (targetStatus === 'rejected') {
+                button.style.display = (data.status === 'pending' || data.status === 'in_progress') ? '' : 'none';
+            }
+        });
+
+        modal.dataset.requestStatus = data.status || '';
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-visible');
+    }
+
+    document.querySelectorAll('[data-open-request]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const payload = button.getAttribute('data-request');
+            if (!payload) { return; }
+            try {
+                const parsed = JSON.parse(payload);
+                openModal(parsed);
+            } catch (error) {
+                console.error('Talep bilgisi çözümlenemedi.', error);
+            }
+        });
+    });
+
+    closeButtons.forEach(function(button) {
+        button.addEventListener('click', closeModal);
+    });
+
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+
+    statusButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const targetStatus = button.dataset.status;
+            if (!targetStatus) { return; }
+            statusForm.querySelector('input[name="action"]').value = 'update_status';
+            statusForm.querySelector('input[name="status_value"]').value = targetStatus;
+            statusForm.submit();
+        });
+    });
+})();
+</script>
+{% endblock %}

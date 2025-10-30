@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Görev Talebi Oluştur · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>📞 Görev Talebi Oluştur</h1>
+    <p>Müşterilerden gelen talepleri hızlıca kaydedin ve ilgili ekiplere aktarın.</p>
+</section>
+
+<form method="post" class="task-request-form">
+    <div class="form-grid">
+        <div class="form-field required">
+            <label for="customer_name">Müşteri Adı</label>
+            <input id="customer_name" name="customer_name" type="text" value="{{ form_values.customer_name }}" minlength="2" required>
+            {% if form_errors.customer_name %}
+            <p class="form-error">{{ form_errors.customer_name }}</p>
+            {% endif %}
+        </div>
+        <div class="form-field">
+            <label for="customer_phone">Telefon</label>
+            <input id="customer_phone" name="customer_phone" type="text" placeholder="0xxx xxx xx xx" value="{{ form_values.customer_phone }}">
+            {% if form_errors.customer_phone %}
+            <p class="form-error">{{ form_errors.customer_phone }}</p>
+            {% endif %}
+        </div>
+        <div class="form-field">
+            <label for="customer_email">E-posta</label>
+            <input id="customer_email" name="customer_email" type="email" value="{{ form_values.customer_email }}">
+        </div>
+        <div class="form-field">
+            <label for="urgency">Aciliyet</label>
+            <select id="urgency" name="urgency">
+                {% for option in urgency_options %}
+                <option value="{{ option.value }}" {% if form_values.urgency == option.value %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-field full">
+            <label for="customer_address">Adres</label>
+            <textarea id="customer_address" name="customer_address" rows="2">{{ form_values.customer_address }}</textarea>
+        </div>
+        <div class="form-field required full">
+            <label for="request_description">Talep Detayı</label>
+            <textarea id="request_description" name="request_description" rows="4" placeholder="Müşterinin talebini detaylı yazınız" minlength="10" required>{{ form_values.request_description }}</textarea>
+            {% if form_errors.request_description %}
+            <p class="form-error">{{ form_errors.request_description }}</p>
+            {% endif %}
+        </div>
+        <div class="form-field full">
+            <label for="requirements">Gereklilikler</label>
+            <textarea id="requirements" name="requirements" rows="4" placeholder="Örn: 2 teknisyen, merdiven, yedek parça (kompresör), özel ekipman">{{ form_values.requirements }}</textarea>
+            {% if form_errors.requirements %}
+            <p class="form-error">{{ form_errors.requirements }}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="form-actions">
+        <a class="button secondary" href="{{ url_for('index') }}">İptal</a>
+        <button type="submit" class="button primary">Kaydet</button>
+    </div>
+</form>
+{% endblock %}

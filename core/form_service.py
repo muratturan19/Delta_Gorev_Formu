@@ -155,6 +155,30 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
         "INSERT OR IGNORE INTO form_sequence (id, last_no) VALUES (1, 0)"
     )
 
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_name TEXT NOT NULL,
+            customer_phone TEXT,
+            customer_email TEXT,
+            customer_address TEXT,
+            request_description TEXT NOT NULL,
+            requirements TEXT,
+            urgency TEXT DEFAULT 'normal',
+            requested_by_user_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            notes TEXT,
+            assigned_to_user_id INTEGER,
+            converted_form_no TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(requested_by_user_id) REFERENCES users(id),
+            FOREIGN KEY(assigned_to_user_id) REFERENCES users(id)
+        )
+        """
+    )
+
     existing_columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(forms)")
     }

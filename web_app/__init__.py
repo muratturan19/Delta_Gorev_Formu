@@ -12,7 +12,7 @@ from flask import (Flask, flash, redirect, render_template, request, send_file,
                    send_from_directory, session, url_for)
 from werkzeug.utils import secure_filename
 
-from core import form_service, user_service
+from core import form_service, task_request_service, user_service
 from core.form_service import FormServiceError
 from core.user_service import UserServiceError
 
@@ -475,6 +475,16 @@ def register_routes(app: Flask) -> None:
             "is_admin": has_role("admin"),
         }
 
+    @app.context_processor
+    def inject_pending_requests():  # pragma: no cover - template helper
+        user = get_current_user()
+        if user and user.get("role") in ["admin", "atayan"]:
+            pending_count = task_request_service.get_pending_requests_count(
+                base_path=str(BASE_PATH)
+            )
+            return {"pending_requests_count": pending_count}
+        return {"pending_requests_count": 0}
+
     def get_locked_forms() -> List[str]:
         return list(session.get("locked_forms", []))
 
@@ -603,6 +613,90 @@ def register_routes(app: Flask) -> None:
         flash("Giriş işlemi iptal edildi.", "info")
         return redirect(url_for("index"))
 
+    @app.route("/task-request/new", methods=["GET", "POST"])
+    def task_request_new():
+        response = require_login()
+        if response is not None:
+            return response
+
+        current = get_current_user()
+        form_values = {
+            "customer_name": "",
+            "customer_phone": "",
+            "customer_email": "",
+            "customer_address": "",
+            "request_description": "",
+            "requirements": "",
+            "urgency": "normal",
+        }
+        errors: Dict[str, str] = {}
+
+        if request.method == "POST":
+            form_values.update(
+                {
+                    "customer_name": request.form.get("customer_name", "").strip(),
+                    "customer_phone": request.form.get("customer_phone", "").strip(),
+                    "customer_email": request.form.get("customer_email", "").strip(),
+                    "customer_address": request.form.get("customer_address", "").strip(),
+                    "request_description": request.form.get("request_description", "").strip(),
+                    "requirements": request.form.get("requirements", "").strip(),
+                    "urgency": (request.form.get("urgency", "normal") or "normal").strip().lower(),
+                }
+            )
+
+            if len(form_values["customer_name"]) < 2:
+                errors["customer_name"] = "Lütfen müşteri adını girin (en az 2 karakter)."
+
+            if form_values["customer_phone"]:
+                import re
+
+                phone_pattern = re.compile(r"^0\d{3}\s?\d{3}\s?\d{2}\s?\d{2}$")
+                if not phone_pattern.match(form_values["customer_phone"]):
+                    errors["customer_phone"] = "Telefon numarası 0xxx xxx xx xx formatında olmalıdır."
+
+            if len(form_values["request_description"]) < 10:
+                errors["request_description"] = "Talep detayı en az 10 karakter olmalıdır."
+
+            if len(form_values["requirements"]) > 500:
+                errors["requirements"] = "Gereklilikler en fazla 500 karakter olabilir."
+
+            if form_values["urgency"] not in task_request_service.VALID_URGENCY:
+                form_values["urgency"] = "normal"
+
+            if not errors:
+                try:
+                    task_request_service.create_task_request(
+                        customer_name=form_values["customer_name"],
+                        customer_phone=form_values["customer_phone"] or None,
+                        customer_email=form_values["customer_email"] or None,
+                        customer_address=form_values["customer_address"] or None,
+                        request_description=form_values["request_description"],
+                        requirements=form_values["requirements"] or None,
+                        urgency=form_values["urgency"],
+                        requested_by_user_id=current.get("id"),
+                        base_path=str(BASE_PATH),
+                    )
+                except task_request_service.TaskRequestError as exc:  # pragma: no cover - güvenlik
+                    flash(str(exc), "error")
+                else:
+                    flash("Görev talebi oluşturuldu. İlgili ekip bilgilendirildi.", "success")
+                    return redirect(url_for("index"))
+            else:
+                flash("Lütfen formu kontrol edin.", "error")
+
+        urgency_options = [
+            {"value": "normal", "label": "Normal"},
+            {"value": "urgent", "label": "Acil"},
+            {"value": "very_urgent", "label": "Çok Acil"},
+        ]
+
+        return render_template(
+            "task_request_form.html",
+            form_values=form_values,
+            form_errors=errors,
+            urgency_options=urgency_options,
+        )
+
     @app.route("/reports")
     def reports():
         response = require_roles("admin", "atayan")
@@ -653,6 +747,110 @@ def register_routes(app: Flask) -> None:
             selected_end=selected_end,
             quick_filters=quick_filters,
         )
+
+    @app.route("/task-requests")
+    def task_requests_list():
+        response = require_roles("admin", "atayan")
+        if response is not None:
+            return response
+
+        status_filter = (request.args.get("status", "") or "").strip().lower()
+        allowed_filters = {"pending", "converted", "rejected"}
+        if status_filter not in allowed_filters:
+            status_filter = ""
+
+        requests_data = task_request_service.list_task_requests(
+            status=status_filter or None,
+            base_path=str(BASE_PATH),
+        )
+
+        for item in requests_data:
+            item["update_url"] = url_for("task_request_update", request_id=item["id"])
+            item["convert_url"] = url_for("new_form", from_request=item["id"])
+            if item.get("converted_form_no"):
+                item["converted_form_url"] = url_for(
+                    "form_summary", form_no=item["converted_form_no"]
+                )
+            else:
+                item["converted_form_url"] = ""
+
+        status_options = [
+            {"value": "", "label": "Tümü"},
+            {"value": "pending", "label": "Bekleyen"},
+            {"value": "converted", "label": "Göreve Dönüştürülenler"},
+            {"value": "rejected", "label": "Reddedilenler"},
+        ]
+
+        return render_template(
+            "task_requests_list.html",
+            task_requests=requests_data,
+            status_options=status_options,
+            status_filter=status_filter,
+        )
+
+    @app.post("/task-requests/<int:request_id>/update")
+    def task_request_update(request_id: int):
+        response = require_roles("admin", "atayan")
+        if response is not None:
+            return response
+
+        redirect_status = (request.form.get("redirect_status", "") or "").strip().lower()
+        redirect_params = {}
+        if redirect_status in {"pending", "converted", "rejected"}:
+            redirect_params["status"] = redirect_status
+
+        current_request = task_request_service.get_task_request(
+            request_id, base_path=str(BASE_PATH)
+        )
+        if current_request is None:
+            flash("Talep bulunamadı.", "error")
+            return redirect(url_for("task_requests_list", **redirect_params))
+
+        action = (request.form.get("action", "") or "").strip()
+        if action == "update_status":
+            status_value = (request.form.get("status_value", "") or "").strip().lower()
+            allowed = False
+            if status_value == "in_progress" and current_request["status"] == "pending":
+                allowed = True
+            elif status_value == "rejected" and current_request["status"] in {"pending", "in_progress"}:
+                allowed = True
+
+            if not allowed:
+                flash("Bu durum değişikliği uygulanamaz.", "error")
+                return redirect(url_for("task_requests_list", **redirect_params))
+
+            try:
+                updated = task_request_service.update_task_request_status(
+                    request_id, status=status_value, base_path=str(BASE_PATH)
+                )
+            except task_request_service.TaskRequestError as exc:
+                flash(str(exc), "error")
+            else:
+                message = (
+                    "Talep incelemede olarak işaretlendi."
+                    if updated["status"] == "in_progress"
+                    else "Talep reddedildi."
+                )
+                flash(message, "success")
+            return redirect(url_for("task_requests_list", **redirect_params))
+
+        if action == "update_notes":
+            notes = request.form.get("notes", "") or ""
+            if len(notes) > 1000:
+                flash("Notlar en fazla 1000 karakter olabilir.", "error")
+                return redirect(url_for("task_requests_list", **redirect_params))
+            try:
+                task_request_service.update_task_request_notes(
+                    request_id, notes=notes, base_path=str(BASE_PATH)
+                )
+            except task_request_service.TaskRequestError as exc:
+                flash(str(exc), "error")
+            else:
+                flash("Notlar güncellendi.", "success")
+            return redirect(url_for("task_requests_list", **redirect_params))
+
+        flash("Geçersiz işlem.", "error")
+        return redirect(url_for("task_requests_list", **redirect_params))
 
     @app.route("/gorevlerim")
     def my_tasks():
@@ -745,6 +943,25 @@ def register_routes(app: Flask) -> None:
         if response is not None:
             return response
 
+        request_id_raw = (request.args.get("from_request", "") or "").strip()
+        linked_request: Optional[Dict[str, Any]] = None
+        if request_id_raw:
+            if not request_id_raw.isdigit():
+                flash("Geçersiz talep seçimi.", "error")
+                return redirect(url_for("task_requests_list"))
+            linked_request = task_request_service.get_task_request(
+                int(request_id_raw), base_path=str(BASE_PATH)
+            )
+            if linked_request is None:
+                flash("Talep bulunamadı.", "error")
+                return redirect(url_for("task_requests_list"))
+            if (
+                linked_request.get("status") == "converted"
+                and linked_request.get("converted_form_no")
+            ):
+                flash("Talep zaten göreve dönüştürülmüş.", "warning")
+                return redirect(url_for("task_requests_list"))
+
         try:
             form_no = form_service.get_next_form_no(base_path=str(BASE_PATH))
         except FormServiceError as exc:
@@ -765,8 +982,30 @@ def register_routes(app: Flask) -> None:
         form_data["assigned_to_user_id"] = None
         form_data["assigned_by_user_id"] = get_current_user()["id"] if get_current_user() else None
         form_data["assigned_at"] = None
+
+        if linked_request:
+            description_parts = ["Müşteri Talebi:", linked_request.get("request_description", "")]
+            requirements = linked_request.get("requirements")
+            if requirements:
+                description_parts.extend(["", "Gereklilikler:", requirements])
+            form_data["gorev_tanimi"] = "\n".join(part for part in description_parts if part is not None)
+            if linked_request.get("customer_address"):
+                form_data["gorev_yeri"] = linked_request["customer_address"]
+            if linked_request.get("customer_name"):
+                form_data["gorev_firma"] = linked_request["customer_name"]
+
         store_form_in_session(form_no, form_data)
-        flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
+        if linked_request:
+            try:
+                task_request_service.mark_converted(
+                    linked_request["id"], form_no=form_no, base_path=str(BASE_PATH)
+                )
+            except task_request_service.TaskRequestError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("task_requests_list"))
+            flash(f"Talep göreve dönüştürüldü: {form_no}", "success")
+        else:
+            flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
         return redirect(url_for("form_wizard", form_no=form_no, step=0))
 
     @app.route("/form/<form_no>", methods=["GET", "POST"])
