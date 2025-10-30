@@ -14,15 +14,10 @@
         <label for="default_rev_no">Varsayılan Revizyon</label>
         <input id="default_rev_no" name="default_rev_no" type="text" value="{{ form_defaults.rev_no }}" placeholder="00 / 06.05.24" required>
 
-        <label for="personel_options">Personel Listesi (her satıra bir değer)</label>
-        <textarea id="personel_options" name="personel_options" rows="8">{{ data.personel_options | join('\n') }}</textarea>
-        <p class="helper-text">Bu liste sadece form dropdown'ları için kullanılır.</p>
+        <p class="helper-text">Görev atama yetkilileri ve çalışan listeleri artık aşağıdaki tablolardan yönetilmektedir.</p>
 
         <label for="taseron_options">Taşeron Şirketler</label>
         <textarea id="taseron_options" name="taseron_options" rows="6">{{ data.taseron_options | join('\n') }}</textarea>
-
-        <label for="hazirlayan_options">Hazırlayan / Görevlendiren</label>
-        <textarea id="hazirlayan_options" name="hazirlayan_options" rows="6">{{ data.hazirlayan_options | join('\n') }}</textarea>
 
         <label for="arac_plaka_options">Araç Plaka Listesi</label>
         <textarea id="arac_plaka_options" name="arac_plaka_options" rows="6">{{ data.arac_plaka_options | join('\n') }}</textarea>
@@ -155,7 +150,7 @@
 
 <section class="form-card">
     <h3>JSON Dosyası Yükle</h3>
-    <p>"personel_options", "taseron_options", "hazirlayan_options" ve "arac_plaka_options" anahtarlarını içeren bir JSON dosyası yükleyerek verileri toplu olarak güncelleyebilirsiniz.</p>
+    <p>"taseron_options" ve "arac_plaka_options" anahtarlarını içeren bir JSON dosyası yükleyerek bu listeleri toplu olarak güncelleyebilirsiniz. Çalışan ve görev atama yetkilisi listeleri kullanıcı tablolarından yönetilir.</p>
     <form method="post" action="{{ url_for('admin_upload') }}" enctype="multipart/form-data" class="stacked">
         <input type="file" name="data_file" accept="application/json" required>
         <button type="submit" class="button secondary">📁 Dosyayı Yükle</button>

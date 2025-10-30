@@ -26,8 +26,8 @@
             <label for="personel_{{ index }}">Personel {{ index }}</label>
             <select id="personel_{{ index }}" name="personel_{{ index }}" class="personel-select">
                 <option value="">Seçiniz</option>
-                {% for option in personel_options %}
-                    <option value="{{ option }}" {% if form_data.get('personel_' ~ index) == option %}selected{% endif %}>{{ option }}</option>
+                {% for user in personel_users %}
+                    <option value="{{ user.full_name }}" {% if form_data.get('personel_' ~ index) == user.full_name %}selected{% endif %}>{{ user.full_name }}</option>
                 {% endfor %}
             </select>
         </div>

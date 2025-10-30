@@ -21,8 +21,8 @@
             <label for="hazirlayan">Hazırlayan</label>
             <select id="hazirlayan" name="hazirlayan">
                 <option value="">Seçiniz</option>
-                {% for option in hazirlayan_options %}
-                    <option value="{{ option }}" {% if form_data.get('hazirlayan') == option %}selected{% endif %}>{{ option }}</option>
+                {% for user in hazirlayan_users %}
+                    <option value="{{ user.full_name }}" {% if form_data.get('hazirlayan') == user.full_name %}selected{% endif %}>{{ user.full_name }}</option>
                 {% endfor %}
             </select>
         </div>

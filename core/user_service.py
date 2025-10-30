@@ -1,12 +1,16 @@
 """Kullanıcı veritabanı işlemleri."""
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Sequence, Set
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .form_service import get_connection
+
+DEFAULT_ASSIGNER_PASSWORD = os.environ.get("DEFAULT_ASSIGNER_PASSWORD", "Gorev123!")
 
 
 class UserServiceError(Exception):
@@ -53,11 +57,26 @@ def list_users(*, base_path: str = ".", include_inactive: bool = False) -> List[
 
 
 def list_users_by_role(role: str, *, base_path: str = ".") -> List[User]:
+    return list_users_by_roles((role,), base_path=base_path)
+
+
+def list_users_by_roles(roles: Sequence[str], *, base_path: str = ".") -> List[User]:
+    normalized_list: List[str] = []
+    for role in roles:
+        normalized = role.strip().lower() if role else ""
+        if not normalized or normalized in normalized_list:
+            continue
+        normalized_list.append(normalized)
+    if not normalized_list:
+        return []
+    placeholders = ",".join("?" for _ in normalized_list)
+    query = (
+        "SELECT * FROM users WHERE role IN ("
+        + placeholders
+        + ") AND is_active = 1 ORDER BY full_name COLLATE NOCASE"
+    )
     with get_connection(base_path) as connection:
-        rows = connection.execute(
-            "SELECT * FROM users WHERE role = ? AND is_active = 1 ORDER BY full_name COLLATE NOCASE",
-            (role,),
-        ).fetchall()
+        rows = connection.execute(query, tuple(normalized_list)).fetchall()
     return [_row_to_user(row) for row in rows]
 
 
@@ -152,6 +171,40 @@ def ensure_default_users(*, base_path: str = ".") -> None:
             "password": "Yonetici123!",
             "role": "atayan",
         },
+        # Legacy hazırlayan listesi (ilk üç isim)
+        {
+            "full_name": "Ali Yılmaz",
+            "email": None,
+            "phone": None,
+            "password": DEFAULT_ASSIGNER_PASSWORD,
+            "role": "atayan",
+        },
+        {
+            "full_name": "Ayşe Demir",
+            "email": None,
+            "phone": None,
+            "password": DEFAULT_ASSIGNER_PASSWORD,
+            "role": "atayan",
+        },
+        {
+            "full_name": "Mehmet Korkmaz",
+            "email": None,
+            "phone": None,
+            "password": DEFAULT_ASSIGNER_PASSWORD,
+            "role": "atayan",
+        },
+        # Legacy personel listesi
+        {"full_name": "Ahmet Yılmaz", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Mehmet Demir", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Ali Kaya", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Veli Çelik", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Hasan Şahin", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Hüseyin Aydın", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "İbrahim Özdemir", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Mustafa Arslan", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Emre Doğan", "email": None, "phone": None, "password": None, "role": "calisan"},
+        {"full_name": "Burak Yıldız", "email": None, "phone": None, "password": None, "role": "calisan"},
+        # Önceki varsayılan çalışanlar
         {
             "full_name": "Mehmet Çalışan",
             "email": "calisan1@deltaproje.com",
@@ -177,22 +230,29 @@ def ensure_default_users(*, base_path: str = ".") -> None:
 
     with get_connection(base_path) as connection:
         existing = connection.execute(
-            "SELECT full_name, email FROM users"
+            "SELECT full_name, COALESCE(email, '') as email, role FROM users"
         ).fetchall()
-        existing_pairs = {(row["full_name"], row["email"]) for row in existing}
+        existing_keys: Set[tuple[str, str, str]] = {
+            (row["full_name"], row["email"], row["role"]) for row in existing
+        }
 
     for payload in defaults:
-        identifier = (payload["full_name"], payload["email"])
-        if identifier in existing_pairs:
+        identifier = (payload["full_name"], payload["email"] or "", payload["role"])
+        if identifier in existing_keys:
             continue
-        create_user(
-            full_name=payload["full_name"],
-            email=payload["email"],
-            phone=payload["phone"],
-            password=payload["password"],
-            role=payload["role"],
-            base_path=base_path,
-        )
+        try:
+            created = create_user(
+                full_name=payload["full_name"],
+                email=payload["email"],
+                phone=payload["phone"],
+                password=payload["password"],
+                role=payload["role"],
+                base_path=base_path,
+            )
+        except UserServiceError:
+            continue
+        else:
+            existing_keys.add((created.full_name, created.email or "", created.role))
 
 
 def update_user_password(user_id: int, password: str, *, base_path: str = ".") -> None:

@@ -1,16 +1,4 @@
 {
-  "personel_options": [
-    "Ahmet Yılmaz",
-    "Mehmet Demir",
-    "Ali Kaya",
-    "Veli Çelik",
-    "Hasan Şahin",
-    "Hüseyin Aydın",
-    "İbrahim Özdemir",
-    "Mustafa Arslan",
-    "Emre Doğan",
-    "Burak Yıldız"
-  ],
   "taseron_options": [
     "Yok",
     "ABC İnşaat",
@@ -18,12 +6,12 @@
     "Marmara Mühendislik",
     "Anadolu Yapı"
   ],
-  "hazirlayan_options": [
-    "Ali Yılmaz",
-    "Ayşe Demir",
-    "Mehmet Korkmaz",
-    "Zeynep Ak",
-    "Elif Kaya"
+  "arac_plaka_options": [
+    "34 ABC 123",
+    "34 XYZ 456",
+    "06 DEF 789",
+    "16 GHI 321",
+    "35 JKL 654"
   ],
   "form_defaults": {
     "dok_no": "F-001",

@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
 
 from flask import (Flask, flash, redirect, render_template, request, send_file,
@@ -79,31 +79,12 @@ FIELD_LABELS: Dict[str, str] = {
 }
 
 DEFAULT_DYNAMIC_DATA: Dict[str, List[str]] = {
-    "personel_options": [
-        "Ahmet Yılmaz",
-        "Mehmet Demir",
-        "Ali Kaya",
-        "Veli Çelik",
-        "Hasan Şahin",
-        "Hüseyin Aydın",
-        "İbrahim Özdemir",
-        "Mustafa Arslan",
-        "Emre Doğan",
-        "Burak Yıldız",
-    ],
     "taseron_options": [
         "Yok",
         "ABC İnşaat",
         "XYZ Teknik",
         "Marmara Mühendislik",
         "Anadolu Yapı",
-    ],
-    "hazirlayan_options": [
-        "Ali Yılmaz",
-        "Ayşe Demir",
-        "Mehmet Korkmaz",
-        "Zeynep Ak",
-        "Elif Kaya",
     ],
     "arac_plaka_options": [
         "34 ABC 123",
@@ -199,6 +180,79 @@ def save_dynamic_data(data: Dict[str, List[str]]) -> None:
     set_storage(storage)
 
 
+def migrate_legacy_user_lists(
+    *, base_path: str, assigners: Optional[List[str]] = None, employees: Optional[List[str]] = None
+) -> None:
+    storage = get_storage()
+
+    legacy_assigners = assigners if assigners is not None else storage.get("hazirlayan_options", [])
+    legacy_employees = employees if employees is not None else storage.get("personel_options", [])
+
+    assigner_names: Set[str] = {
+        user.full_name.strip().lower()
+        for user in user_service.list_users_by_roles(("admin", "atayan"), base_path=base_path)
+    }
+    employee_names: Set[str] = {
+        user.full_name.strip().lower()
+        for user in user_service.list_users_by_role("calisan", base_path=base_path)
+    }
+
+    created_assigners = 0
+    if isinstance(legacy_assigners, list):
+        for raw_name in legacy_assigners:
+            if created_assigners >= 3:
+                break
+            if not isinstance(raw_name, str):
+                continue
+            cleaned = raw_name.strip()
+            if not cleaned or cleaned.lower() in assigner_names:
+                continue
+            try:
+                user_service.create_user(
+                    full_name=cleaned,
+                    email=None,
+                    phone=None,
+                    password=user_service.DEFAULT_ASSIGNER_PASSWORD,
+                    role="atayan",
+                    base_path=base_path,
+                )
+            except UserServiceError:
+                continue
+            else:
+                assigner_names.add(cleaned.lower())
+                created_assigners += 1
+
+    if isinstance(legacy_employees, list):
+        for raw_name in legacy_employees:
+            if not isinstance(raw_name, str):
+                continue
+            cleaned = raw_name.strip()
+            if not cleaned or cleaned.lower() in employee_names:
+                continue
+            try:
+                user_service.create_user(
+                    full_name=cleaned,
+                    email=None,
+                    phone=None,
+                    password=None,
+                    role="calisan",
+                    base_path=base_path,
+                )
+            except UserServiceError:
+                continue
+            else:
+                employee_names.add(cleaned.lower())
+
+    if assigners is None and employees is None:
+        if "hazirlayan_options" in storage or "personel_options" in storage:
+            cleaned_storage = storage.copy()
+            cleaned_storage.pop("hazirlayan_options", None)
+            cleaned_storage.pop("personel_options", None)
+            set_storage(cleaned_storage)
+            global _dynamic_data
+            _dynamic_data = None
+
+
 def get_dynamic_data() -> Dict[str, List[str]]:
     global _dynamic_data
     if _dynamic_data is None:
@@ -259,6 +313,7 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
     user_service.ensure_default_users(base_path=str(BASE_PATH))
+    migrate_legacy_user_lists(base_path=str(BASE_PATH))
     register_routes(app)
     return app
 
@@ -415,9 +470,7 @@ def register_routes(app: Flask) -> None:
         return {
             "FORM_STEPS": FORM_STEPS,
             "total_steps": total_steps,
-            "personel_options": dynamic_data["personel_options"],
             "taseron_options": dynamic_data["taseron_options"],
-            "hazirlayan_options": dynamic_data["hazirlayan_options"],
             "arac_plaka_options": dynamic_data["arac_plaka_options"],
             "is_admin": has_role("admin"),
         }
@@ -853,20 +906,26 @@ def register_routes(app: Flask) -> None:
             assigned_by_user = user_service.get_user(
                 int(form_data["assigned_by_user_id"]), base_path=str(BASE_PATH)
             )
+
+        personel_users = user_service.list_users_by_role(
+            "calisan", base_path=str(BASE_PATH)
+        )
+        hazirlayan_users = user_service.list_users_by_roles(
+            ("admin", "atayan"), base_path=str(BASE_PATH)
+        )
+
         available_employees = []
         if has_role("admin", "atayan"):
-            available_employees = user_service.list_users_by_role(
-                "calisan", base_path=str(BASE_PATH)
-            )
+            available_employees = personel_users
         return render_template(
             current_step["template"],
             form_no=form_no,
             form_data=form_data,
             step_index=step,
-            personel_options=dynamic_data["personel_options"],
             taseron_options=dynamic_data["taseron_options"],
-            hazirlayan_options=dynamic_data["hazirlayan_options"],
             arac_plaka_options=dynamic_data["arac_plaka_options"],
+            hazirlayan_users=hazirlayan_users,
+            personel_users=personel_users,
             read_only_step=read_only_step,
             is_employee=is_employee,
             assigned_user=assigned_user,
@@ -1097,6 +1156,11 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_panel"))
 
         set_dynamic_data({key: payload.get(key, []) for key in DEFAULT_DYNAMIC_DATA})
+        migrate_legacy_user_lists(
+            base_path=str(BASE_PATH),
+            assigners=payload.get("hazirlayan_options"),
+            employees=payload.get("personel_options"),
+        )
 
         defaults_payload = payload.get("form_defaults", {})
         if isinstance(defaults_payload, dict):
@@ -1221,10 +1285,18 @@ def register_routes(app: Flask) -> None:
             if tarih:
                 form_data["tarih"] = tarih
         elif step_id == "hazirlayan":
-            form_data["hazirlayan"] = data.get("hazirlayan", "").strip()
+            selected = data.get("hazirlayan", "").strip()
+            valid_assigners = {
+                user.full_name for user in user_service.list_users_by_roles(("admin", "atayan"), base_path=str(BASE_PATH))
+            }
+            form_data["hazirlayan"] = selected if selected in valid_assigners else ""
         elif step_id == "gorevli_personel":
+            valid_employees = {
+                user.full_name for user in user_service.list_users_by_role("calisan", base_path=str(BASE_PATH))
+            }
             for index in range(1, 6):
-                form_data[f"personel_{index}"] = data.get(f"personel_{index}", "").strip()
+                value = data.get(f"personel_{index}", "").strip()
+                form_data[f"personel_{index}"] = value if value in valid_employees else ""
             form_data["gorev_tarih"] = normalize_date(data.get("gorev_tarih", ""))
         elif step_id == "finans_arac":
             form_data["avans"] = data.get("avans", "").strip()
