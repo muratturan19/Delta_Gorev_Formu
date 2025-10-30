@@ -84,9 +84,11 @@ def test_save_partial_form(tmp_path, sample_form_data):
     stored = _fetch_form(tmp_path, "00042")
     assert stored["durum"] == "YARIM"
     assert stored["gorev_yeri"] == sample_form_data["gorev_yeri"]
+    assert stored["last_step"] == 0
 
 
 def test_save_and_load_form(tmp_path, sample_form_data):
+    sample_form_data["last_step"] = 4
     db_path, status = form_service.save_form(
         "00077", sample_form_data, base_path=str(tmp_path)
     )
@@ -97,10 +99,12 @@ def test_save_and_load_form(tmp_path, sample_form_data):
 
     stored = _fetch_form(tmp_path, "00077")
     assert stored["durum"] == "TAMAMLANDI"
+    assert stored["last_step"] == 4
 
     loaded = form_service.load_form_data("00077", base_path=str(tmp_path))
     assert loaded["gorev_yeri"] == sample_form_data["gorev_yeri"]
     assert loaded["durum"] == "TAMAMLANDI"
+    assert loaded["last_step"] == 4
 
 
 def test_search_forms_filters(tmp_path, sample_form_data):

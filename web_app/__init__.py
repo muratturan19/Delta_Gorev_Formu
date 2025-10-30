@@ -399,7 +399,10 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("form_summary", form_no=form_no))
 
         unlock_form(form_no)
-        return redirect(url_for("form_wizard", form_no=form_no, step=0))
+        last_step = clamp_step(form_data.get("last_step", 0))
+        form_data["last_step"] = last_step
+        store_form_in_session(form_no, form_data)
+        return redirect(url_for("form_wizard", form_no=form_no, step=last_step))
 
     @app.route("/form/new")
     def new_form():
@@ -418,6 +421,7 @@ def register_routes(app: Flask) -> None:
             "rev_no": form_defaults["rev_no"],
         }
         form_data["gorev_ekleri"] = []
+        form_data["last_step"] = 0
         store_form_in_session(form_no, form_data)
         flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
         return redirect(url_for("form_wizard", form_no=form_no, step=0))
@@ -463,12 +467,23 @@ def register_routes(app: Flask) -> None:
                     flash(message, category)
                 else:
                     flash("Silinecek ek bulunamadı.", "warning")
+                update_last_step(form_data, step)
                 store_form_in_session(form_no, form_data)
                 return redirect(url_for("form_wizard", form_no=form_no, step=step))
 
+            action = request.form.get("action")
+
+            target_step = step
+            if action == "previous":
+                target_step = max(0, step - 1)
+            elif action == "save":
+                target_step = step
+            else:
+                target_step = min(total_steps - 1, step + 1)
+
+            update_last_step(form_data, target_step)
             store_form_in_session(form_no, form_data)
 
-            action = request.form.get("action")
             if action == "previous":
                 previous_step = max(0, step - 1)
                 return redirect(url_for("form_wizard", form_no=form_no, step=previous_step))
@@ -520,6 +535,8 @@ def register_routes(app: Flask) -> None:
             action = request.form.get("action")
             if action == "save":
                 try:
+                    update_last_step(form_data, total_steps - 1)
+                    store_form_in_session(form_no, form_data)
                     _, status = form_service.save_form(form_no, form_data, base_path=str(BASE_PATH))
                 except FormServiceError as exc:
                     flash(str(exc), "error")
@@ -693,11 +710,15 @@ def register_routes(app: Flask) -> None:
             return 0
         return max(0, min(value, total_steps - 1))
 
+    def update_last_step(form_data: Dict[str, Any], value: int) -> None:
+        form_data["last_step"] = clamp_step(value)
+
     def ensure_form_data(form_no: str):
         forms = session.get("forms", {})
         form_data = forms.get(form_no)
         if form_data:
             normalize_attachments(form_data)
+            update_last_step(form_data, form_data.get("last_step", 0))
             return form_data
         try:
             loaded = form_service.load_form_data(form_no, base_path=str(BASE_PATH))
@@ -711,6 +732,7 @@ def register_routes(app: Flask) -> None:
 
     def store_form_in_session(form_no: str, form_data: Dict[str, Any]) -> None:
         normalize_attachments(form_data)
+        update_last_step(form_data, form_data.get("last_step", 0))
         forms = session.get("forms", {})
         forms[form_no] = form_data
         session["forms"] = forms
