@@ -38,6 +38,14 @@
                 {% endif %}
                 {% if current_user %}
                     {% if current_user.role in ['admin', 'atayan'] %}
+                        <a href="{{ url_for('task_requests_list') }}">
+                            📋 Görev Talepleri
+                            {% if pending_requests_count > 0 %}
+                            <span class="badge-count">{{ pending_requests_count }}</span>
+                            {% endif %}
+                        </a>
+                    {% endif %}
+                    {% if current_user.role in ['admin', 'atayan'] %}
                         <a href="{{ url_for('reports') }}">📈 Raporlama</a>
                     {% endif %}
                     {% if current_user.role == 'admin' %}

@@ -92,13 +92,13 @@
         {% endif %}
     </div>
 
-    {% if current_user.role == 'admin' %}
     <div class="menu-card accent-green">
-        <h2>🛠️ Admin Paneli</h2>
-        <p>Kullanıcı yönetimi ve sistem ayarları için admin panelini açın.</p>
-        <a class="button" href="{{ url_for('admin_panel') }}">Admin Panelini Aç</a>
+        <h2>📞 Görev Talebi Oluştur</h2>
+        <p>Müşteri talepleri için hızlı kayıt oluşturun.</p>
+        <a class="button primary" href="{{ url_for('task_request_new') }}">Talep Oluştur</a>
     </div>
-    {% elif current_user.role == 'calisan' %}
+
+    {% if current_user.role == 'calisan' %}
     <div class="menu-card accent-green">
         <h2>🗂️ Görevlerim</h2>
         <p>Tüm görevlerinizi tek ekranda listeleyin ve ilerlemenizi takip edin.</p>
