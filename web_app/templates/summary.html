@@ -59,6 +59,24 @@
                 <th class="label">Görev Yeri</th>
                 <td colspan="5">{{ form_data.get('gorev_yeri', '') or '-' }}</td>
             </tr>
+            <tr>
+                <th class="label">Yapılan İşler</th>
+                <td colspan="5">{{ form_data.get('yapilan_isler', '') or '-' }}</td>
+            </tr>
+            {% if form_data.get('gorev_ekleri') %}
+            <tr>
+                <th class="label">Ekler</th>
+                <td colspan="5">
+                    <ul class="attachment-list summary">
+                        {% for attachment in form_data.get('gorev_ekleri', []) %}
+                        <li>
+                            <a href="{{ url_for('download_attachment', form_no=form_no, filename=attachment.filename) }}">{{ attachment.original_name }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            {% endif %}
             <tr class="section">
                 <th colspan="6">SEYAHAT / ÇALIŞMA BİLGİLERİ</th>
             </tr>

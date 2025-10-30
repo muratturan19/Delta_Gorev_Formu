@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Form {{ form_no }} · Saat Bilgileri{% endblock %}
+{% block title %}Form {{ form_no }} · Görev Bilgileri{% endblock %}
 
 {% block steps %}
 <div class="step-indicator">
@@ -13,8 +13,8 @@
 {% endblock %}
 
 {% block content %}
-<h2>🕐 Saat ve Tarih Bilgileri</h2>
-<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card form-scroll">
+<h2>🕐 Görev Bilgileri</h2>
+<form method="post" enctype="multipart/form-data" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card form-scroll">
     <input type="hidden" name="action" value="next">
     <div class="grid grid-2">
         <div class="form-row">
@@ -53,6 +53,30 @@
             <label for="mola_suresi">Toplam Mola (dakika)</label>
             <input id="mola_suresi" name="mola_suresi" type="number" min="0" step="5" value="{{ form_data.get('mola_suresi', '') }}">
         </div>
+    </div>
+    <div class="form-row">
+        <label for="yapilan_isler">Yapılan İşler</label>
+        <textarea id="yapilan_isler" name="yapilan_isler" rows="6" placeholder="Görev kapsamında yapılan işleri yazınız">{{ form_data.get('yapilan_isler', '') }}</textarea>
+    </div>
+    <div class="form-row">
+        <label for="gorev_ekleri">Görev Ekleri</label>
+        <input id="gorev_ekleri" name="gorev_ekleri" type="file" multiple>
+        <small>Birden fazla dosya seçebilirsiniz. Fotoğraflar, raporlar veya diğer belgeleri ekleyin.</small>
+        {% if form_data.get('gorev_ekleri') %}
+        <ul class="attachment-list">
+            {% for attachment in form_data.get('gorev_ekleri', []) %}
+            <li>
+                <div class="attachment-meta">
+                    <span class="attachment-name">{{ attachment.original_name }}</span>
+                </div>
+                <div class="attachment-actions">
+                    <a class="button ghost small" href="{{ url_for('download_attachment', form_no=form_no, filename=attachment.filename) }}" target="_blank">İndir</a>
+                    <button type="submit" class="button danger small" name="remove_attachment" value="{{ attachment.filename }}">Sil</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </div>
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>

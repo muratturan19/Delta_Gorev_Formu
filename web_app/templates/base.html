@@ -7,47 +7,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<header class="app-header">
-    <div class="container">
-        <div class="app-brand">
-            <img src="{{ url_for('static', filename='images/dp_seffaf.PNG') }}" alt="Delta Proje logosu" class="app-logo">
-            <h1>Delta Proje &mdash; Görev Formu Sistemi</h1>
-        </div>
-        <nav>
-            <a href="{{ url_for('index') }}">Ana Menü</a>
-            {% if form_no %}
-            <a href="{{ url_for('form_wizard', form_no=form_no, step=0) }}">Form {{ form_no }}</a>
-            <a href="{{ url_for('form_summary', form_no=form_no) }}">Özet</a>
-            {% endif %}
-            <a href="{{ url_for('admin_panel') }}">Admin Paneli</a>
-            {% if is_admin %}
-            <a href="{{ url_for('admin_logout') }}">Çıkış</a>
-            {% endif %}
-        </nav>
-    </div>
-</header>
-<main class="container">
-    {% with messages = get_flashed_messages(with_categories=True) %}
-        {% if messages %}
-            <div class="flash-container">
-                {% for category, message in messages %}
-                    <div class="flash flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
+<div class="app-shell">
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="app-brand">
+                <img src="{{ url_for('static', filename='images/dp_seffaf.PNG') }}" alt="Delta Proje logosu" class="app-logo">
+                <div class="brand-text">
+                    <span class="brand-title">Delta Proje</span>
+                    <span class="brand-subtitle">Görev Formu Sistemi</span>
+                </div>
             </div>
-        {% endif %}
-    {% endwith %}
+        </div>
+    </header>
+    <div class="app-body">
+        <aside class="app-sidebar">
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('index') }}">🏠 Ana Menü</a>
+                {% if form_no %}
+                <a href="{{ url_for('form_wizard', form_no=form_no, step=0) }}">🧾 Form {{ form_no }}</a>
+                <a href="{{ url_for('form_summary', form_no=form_no) }}">📊 Özet</a>
+                {% endif %}
+                <a href="{{ url_for('admin_panel') }}">🛠️ Admin Paneli</a>
+                {% if is_admin %}
+                <a href="{{ url_for('admin_logout') }}">🚪 Çıkış</a>
+                {% endif %}
+            </nav>
+            {% if FORM_STEPS and form_no %}
+            <div class="sidebar-steps">
+                <h3>Form Adımları</h3>
+                <ol>
+                    {% for step in FORM_STEPS %}
+                    <li class="{% if loop.index0 == step_index|default(-1) %}current{% elif loop.index0 < step_index|default(-1) %}done{% endif %}">
+                        <span class="step-number">{{ loop.index }}</span>
+                        <span class="step-label">{{ step.title }}</span>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+        </aside>
+        <main class="app-main">
+            <div class="app-main-inner">
+                {% with messages = get_flashed_messages(with_categories=True) %}
+                    {% if messages %}
+                        <div class="flash-container">
+                            {% for category, message in messages %}
+                                <div class="flash flash-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
 
-    {% block steps %}{% endblock %}
+                {% block steps %}{% endblock %}
 
-    <section class="content">
-        {% block content %}{% endblock %}
-    </section>
-</main>
-<footer class="app-footer">
-    <div class="container">
-        <small>&copy; {{ datetime.utcnow().year }} Delta Proje</small>
+                <section class="content">
+                    {% block content %}{% endblock %}
+                </section>
+            </div>
+        </main>
     </div>
-</footer>
+    <footer class="app-footer">
+        <div class="footer-inner">
+            <small>&copy; {{ datetime.utcnow().year }} Delta Proje</small>
+        </div>
+    </footer>
+</div>
 <script>
     document.querySelectorAll('[data-action="submit-step"]').forEach(function(button) {
         button.addEventListener('click', function (event) {
