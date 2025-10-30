@@ -974,10 +974,13 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("task_requests_list"))
 
         try:
-            form_no = form_service.get_next_form_no(base_path=str(BASE_PATH))
+            form_no = form_service.generate_form_number(base_path=str(BASE_PATH))
         except FormServiceError as exc:
             flash(str(exc), "error")
             return redirect(url_for("index"))
+
+        if not form_no.startswith("F-"):
+            form_no = f"F-{form_no}"
 
         form_defaults = get_form_defaults()
         form_data = {
@@ -991,7 +994,7 @@ def register_routes(app: Flask) -> None:
         form_data["harcama_bildirimleri"] = []
         form_data["last_step"] = 0
         form_data["assigned_to_user_id"] = None
-        form_data["assigned_by_user_id"] = get_current_user()["id"] if get_current_user() else None
+        form_data["assigned_by_user_id"] = None
         form_data["assigned_at"] = None
 
         if linked_request:
@@ -1017,7 +1020,10 @@ def register_routes(app: Flask) -> None:
             flash(f"Talep göreve dönüştürüldü: {form_no}", "success")
         else:
             flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
-        return redirect(url_for("form_wizard", form_no=form_no, step=0))
+        redirect_url = url_for("form_wizard", form_no=form_no, step=0)
+        print(f"🔍 Oluşturulan form_no: '{form_no}'")
+        print(f"🔍 Redirect URL: {redirect_url}")
+        return redirect(redirect_url)
 
     @app.route("/form/<form_no>", methods=["GET", "POST"])
     def form_wizard(form_no: str):
@@ -1164,9 +1170,11 @@ def register_routes(app: Flask) -> None:
             ("admin", "atayan"), base_path=str(BASE_PATH)
         )
 
-        available_employees = []
-        if has_role("admin", "atayan"):
-            available_employees = personel_users
+        responsible_name = ""
+        if assigned_user:
+            responsible_name = assigned_user.full_name
+        elif form_data.get("personel_1"):
+            responsible_name = form_data["personel_1"]
         return render_template(
             current_step["template"],
             form_no=form_no,
@@ -1180,7 +1188,7 @@ def register_routes(app: Flask) -> None:
             is_employee=is_employee,
             assigned_user=assigned_user,
             assigned_by_user=assigned_by_user,
-            available_employees=available_employees,
+            responsible_name=responsible_name,
         )
 
     @app.route("/form/<form_no>/summary", methods=["GET", "POST"])
@@ -1548,6 +1556,24 @@ def register_routes(app: Flask) -> None:
                 value = data.get(f"personel_{index}", "").strip()
                 form_data[f"personel_{index}"] = value if value in valid_employees else ""
             form_data["gorev_tarih"] = normalize_date(data.get("gorev_tarih", ""))
+            primary_employee = form_data.get("personel_1", "").strip()
+            if primary_employee:
+                employee_obj = user_service.get_user_by_name(
+                    primary_employee, base_path=str(BASE_PATH)
+                )
+                if employee_obj and employee_obj.role == "calisan":
+                    current_user_obj = get_current_user() or {}
+                    form_data["assigned_to_user_id"] = employee_obj.id
+                    form_data["assigned_by_user_id"] = current_user_obj.get("id")
+                    form_data["assigned_at"] = datetime.now().isoformat()
+                else:
+                    form_data["assigned_to_user_id"] = None
+                    form_data["assigned_by_user_id"] = None
+                    form_data["assigned_at"] = None
+            else:
+                form_data["assigned_to_user_id"] = None
+                form_data["assigned_by_user_id"] = None
+                form_data["assigned_at"] = None
         elif step_id == "finans_arac":
             form_data["avans"] = data.get("avans", "").strip()
             form_data["taseron"] = data.get("taseron", "").strip()

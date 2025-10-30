@@ -88,6 +88,29 @@ def get_user(user_id: int, *, base_path: str = ".") -> Optional[User]:
     return _row_to_user(row)
 
 
+def get_user_by_name(full_name: str, *, base_path: str = ".") -> Optional[User]:
+    """Çalışan rolündeki kullanıcıyı tam ismine göre döndür."""
+
+    normalized = (full_name or "").strip()
+    if not normalized:
+        return None
+
+    with get_connection(base_path) as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE full_name = ? AND role = 'calisan' AND is_active = 1
+            LIMIT 1
+            """,
+            (normalized,),
+        ).fetchone()
+
+    if row is None:
+        return None
+    return _row_to_user(row)
+
+
 def authenticate_user(user_id: int, password: str, *, base_path: str = ".") -> bool:
     with get_connection(base_path) as connection:
         row = connection.execute(
