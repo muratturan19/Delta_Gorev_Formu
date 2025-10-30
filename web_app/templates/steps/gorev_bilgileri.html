@@ -121,10 +121,17 @@
         </ul>
         {% endif %}
     </div>
+    {% if is_employee %}
+    <div class="form-actions employee">
+        <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
+        <a class="button primary" href="{{ url_for('form_summary', form_no=form_no) }}">Özet →</a>
+    </div>
+    {% else %}
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
         <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
         <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
     </div>
+    {% endif %}
 </form>
 {% endblock %}

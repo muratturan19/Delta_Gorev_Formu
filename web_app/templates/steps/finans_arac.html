@@ -16,38 +16,46 @@
 <h2>💼 Avans ve Araç Bilgileri</h2>
 <form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
     <input type="hidden" name="action" value="next">
-    <div class="grid grid-2">
-        <div class="form-row">
-            <label for="avans">Avans Tutarı</label>
-            <input id="avans" name="avans" type="text" value="{{ form_data.get('avans', '') }}" placeholder="Örn. 1500 TL">
+    <fieldset class="form-fields" {% if read_only_step %}disabled{% endif %}>
+        <div class="grid grid-2">
+            <div class="form-row">
+                <label for="avans">Avans Tutarı</label>
+                <input id="avans" name="avans" type="text" value="{{ form_data.get('avans', '') }}" placeholder="Örn. 1500 TL">
+            </div>
+            <div class="form-row">
+                <label for="taseron">Taşeron Şirket</label>
+                <select id="taseron" name="taseron">
+                    <option value="">Seçiniz</option>
+                    {% for option in taseron_options %}
+                        <option value="{{ option }}" {% if form_data.get('taseron') == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-row">
+                <label for="arac_plaka">Araç Plaka No</label>
+                {% set current_value = form_data.get('arac_plaka', '') %}
+                <select id="arac_plaka" name="arac_plaka">
+                    <option value="">Bir araç seçin</option>
+                    {% for option in arac_plaka_options %}
+                        <option value="{{ option }}" {{ 'selected' if option == current_value else '' }}>{{ option }}</option>
+                    {% endfor %}
+                    {% if current_value and current_value not in arac_plaka_options %}
+                        <option value="{{ current_value }}" selected>{{ current_value }}</option>
+                    {% endif %}
+                </select>
+            </div>
         </div>
-        <div class="form-row">
-            <label for="taseron">Taşeron Şirket</label>
-            <select id="taseron" name="taseron">
-                <option value="">Seçiniz</option>
-                {% for option in taseron_options %}
-                    <option value="{{ option }}" {% if form_data.get('taseron') == option %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-row">
-            <label for="arac_plaka">Araç Plaka No</label>
-            {% set current_value = form_data.get('arac_plaka', '') %}
-            <select id="arac_plaka" name="arac_plaka">
-                <option value="">Bir araç seçin</option>
-                {% for option in arac_plaka_options %}
-                    <option value="{{ option }}" {{ 'selected' if option == current_value else '' }}>{{ option }}</option>
-                {% endfor %}
-                {% if current_value and current_value not in arac_plaka_options %}
-                    <option value="{{ current_value }}" selected>{{ current_value }}</option>
-                {% endif %}
-            </select>
-        </div>
+    </fieldset>
+    {% if is_employee and read_only_step %}
+    <div class="form-actions single">
+        <a class="button primary" href="{{ url_for('form_wizard', form_no=form_no, step=5) }}">Görev Bilgilerini Doldur →</a>
     </div>
+    {% else %}
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
         <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
         <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
     </div>
+    {% endif %}
 </form>
 {% endblock %}

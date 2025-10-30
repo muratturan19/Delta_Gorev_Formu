@@ -45,6 +45,20 @@ tests/               # Pytest senaryoları
 > Varsayılan olarak oturum verileri Flask'in yerleşik imzalı çerez mekanizmasıyla yönetilir.
 > Kalıcı bir gizli anahtar tanımlamak için `FLASK_SECRET_KEY` ortam değişkenini ayarlayabilirsiniz.
 
+## Kullanıcı Rolleri ve Oturum Akışı
+
+- Uygulama açıldığında kullanıcı seçimi için bir karşılama penceresi görünür. Tüm kullanıcılar
+  açılır listeden kendisini seçer; admin ve görev atama yetkilileri için ek olarak şifre girişi
+  istenir.
+- Roller: `admin`, `atayan` (görev atama yetkilisi) ve `calisan`. Admin ve atayan hesaplarının
+  şifreleri zorunludur; çalışan hesapları şifresizdir ve yalnızca kendilerine atanan görevlerin
+  6. adımını (görev raporu ve harcamalar) düzenleyebilir.
+- Yan menü ve ana sayfa kartları rol bazlı olarak şekillenir. Örneğin adminler admin paneli ve
+  raporlama bölümlerine erişirken, çalışanlar "Görevlerim" listesine yönlendirilir.
+- Çıkış işlemi üst menüdeki "Çıkış Yap" bağlantısıyla yapılır; işlem tamamlandığında karşılama
+  penceresi yeniden açılır.
+
+
 ## Form Dosyaları
 - Kayıtlı formlar proje kökünde `gorev_formu_XXXXX.xlsx` adıyla oluşur.
 - Numara sıralaması `form_config.json` dosyasından takip edilir; dosyayı silmek numaralandırmayı sıfırlar

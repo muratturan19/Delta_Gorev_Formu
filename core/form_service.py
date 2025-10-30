@@ -10,7 +10,7 @@ import unicodedata
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from openpyxl import Workbook
 from openpyxl.styles import Border, Font, PatternFill, Side
@@ -47,6 +47,12 @@ def get_db_path(base_path: str = ".") -> str:
     return os.path.join(base_path, DB_FILENAME)
 
 
+def get_connection(base_path: str = ".") -> sqlite3.Connection:
+    """Uygulama genelinde kullanılan veritabanı bağlantısını döndür."""
+
+    return _connect(base_path)
+
+
 def _connect(base_path: str = ".") -> sqlite3.Connection:
     db_path = get_db_path(base_path)
     directory = os.path.dirname(db_path)
@@ -61,6 +67,21 @@ def _connect(base_path: str = ".") -> sqlite3.Connection:
 
 
 def _ensure_schema(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT,
+            phone TEXT,
+            password_hash TEXT,
+            role TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS forms (
@@ -106,8 +127,13 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             personel_5 TEXT,
             personel_search TEXT,
             last_step INTEGER DEFAULT 0,
+            assigned_to_user_id INTEGER,
+            assigned_by_user_id INTEGER,
+            assigned_at TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY(assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
         )
         """
     )
@@ -142,9 +168,17 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
         ("gorev_il", "TEXT"),
         ("gorev_ilce", "TEXT"),
         ("gorev_firma", "TEXT"),
+        ("assigned_to_user_id", "INTEGER"),
+        ("assigned_by_user_id", "INTEGER"),
+        ("assigned_at", "TEXT"),
     ):
         if column not in existing_columns:
             connection.execute(f"ALTER TABLE forms ADD COLUMN {column} {definition}")
+
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_forms_assigned_to ON forms(assigned_to_user_id)"
+    )
+
 
 
 def determine_form_status(form_data: Dict[str, Any]) -> FormStatus:
@@ -285,6 +319,14 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     payload["hazirlayan"] = (form_data.get("hazirlayan") or "").strip()
     payload["durum"] = status.code
 
+    payload["assigned_to_user_id"] = _normalize_optional_int(
+        form_data.get("assigned_to_user_id")
+    )
+    payload["assigned_by_user_id"] = _normalize_optional_int(
+        form_data.get("assigned_by_user_id")
+    )
+    payload["assigned_at"] = (form_data.get("assigned_at") or "").strip() or None
+
     personel_values = []
     for field in PERSONEL_FIELDS:
         value = (form_data.get(field) or "").strip()
@@ -302,6 +344,15 @@ def _normalize_last_step(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, numeric)
+
+
+def _normalize_optional_int(value: Any) -> Optional[int]:
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _persist_form(
@@ -391,6 +442,9 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
         "durum": (row["durum"] or "YARIM").upper(),
         "mola_suresi": row["mola_suresi"] or "",
         "last_step": _normalize_last_step(last_step_value),
+        "assigned_to_user_id": row["assigned_to_user_id"] if "assigned_to_user_id" in row_keys else None,
+        "assigned_by_user_id": row["assigned_by_user_id"] if "assigned_by_user_id" in row_keys else None,
+        "assigned_at": row["assigned_at"] if "assigned_at" in row_keys else None,
     }
 
     attachments_raw = row["gorev_ekleri"] or "[]"
@@ -464,6 +518,31 @@ def save_partial_form(
     status = FormStatus(code="YARIM", missing_fields=[])
     db_path = _persist_form(form_no, form_data, status, base_path=base_path)
     return db_path, status
+
+
+def assign_form(
+    form_no: str,
+    *,
+    assigned_to_user_id: Optional[int],
+    assigned_by_user_id: Optional[int],
+    base_path: str = ".",
+) -> Optional[str]:
+    """Bir formu belirli bir kullanıcıya atar veya atamayı kaldırır."""
+
+    assigned_to = _normalize_optional_int(assigned_to_user_id)
+    assigned_by = _normalize_optional_int(assigned_by_user_id)
+    assigned_at = datetime.utcnow().isoformat(timespec="seconds") if assigned_to else None
+
+    with _connect(base_path) as connection:
+        result = connection.execute(
+            "UPDATE forms SET assigned_to_user_id = ?, assigned_by_user_id = ?, assigned_at = ?, updated_at = CURRENT_TIMESTAMP WHERE form_no = ?",
+            (assigned_to, assigned_by, assigned_at, form_no),
+        )
+        if result.rowcount == 0:
+            raise FormServiceError(f"Form {form_no} bulunamadı.")
+        connection.commit()
+
+    return assigned_at
 
 
 def save_form(
@@ -558,6 +637,45 @@ def search_forms(
         )
 
     return results
+
+
+def list_forms_for_assignee(
+    assigned_user_id: int,
+    *,
+    base_path: str = ".",
+) -> List[Dict[str, Any]]:
+    """Belirli bir çalışana atanan formları döndür."""
+
+    query = (
+        "SELECT f.form_no, f.gorev_yeri, f.gorev_tanimi, f.durum, f.gorev_tarih, "
+        "f.yola_cikis_tarih, f.assigned_at, f.assigned_by_user_id, u.full_name AS assigned_by_name, "
+        "f.updated_at "
+        "FROM forms f "
+        "LEFT JOIN users u ON u.id = f.assigned_by_user_id "
+        "WHERE f.assigned_to_user_id = ? "
+        "ORDER BY f.updated_at DESC"
+    )
+
+    with _connect(base_path) as connection:
+        rows = connection.execute(query, (assigned_user_id,)).fetchall()
+
+    assignments: List[Dict[str, Any]] = []
+    for row in rows:
+        assignments.append(
+            {
+                "form_no": row["form_no"],
+                "gorev_yeri": row["gorev_yeri"] or "",
+                "gorev_tanimi": row["gorev_tanimi"] or "",
+                "durum": (row["durum"] or "").upper(),
+                "gorev_tarih": row["gorev_tarih"] or row["yola_cikis_tarih"] or "",
+                "assigned_at": row["assigned_at"],
+                "assigned_by_user_id": row["assigned_by_user_id"],
+                "assigned_by_name": row["assigned_by_name"] or "",
+                "updated_at": row["updated_at"],
+            }
+        )
+
+    return assignments
 
 
 def get_reporting_summary(

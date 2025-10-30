@@ -34,6 +34,14 @@
     <div class="summary-table-wrapper">
         <table class="summary-table">
             <tbody>
+            {% if assigned_user or assigned_by_user %}
+            <tr class="assignment-row">
+                <th class="label">Görevli</th>
+                <td colspan="2">{{ assigned_user.full_name if assigned_user else 'Belirlenmedi' }}</td>
+                <th class="label">Atayan</th>
+                <td colspan="2">{{ assigned_by_user.full_name if assigned_by_user else 'Belirlenmedi' }}</td>
+            </tr>
+            {% endif %}
             <tr class="section">
                 <th colspan="2">GÖREVLİ PERSONEL</th>
                 <th colspan="2">AVANS TUTARI</th>

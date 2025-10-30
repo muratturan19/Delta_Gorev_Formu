@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Görevlerim · Görev Formu Sistemi{% endblock %}
+
+{% block content %}
+<section class="tasks-section">
+    <header class="section-header">
+        <h2>🗂️ Görevlerim</h2>
+        <p>Size atanan tüm görev formları bu listede yer alır. Form numarasına tıklayarak detaylara erişebilirsiniz.</p>
+    </header>
+
+    {% if assignments %}
+    <div class="table-wrapper">
+        <table class="tasks-table">
+            <thead>
+                <tr>
+                    <th>Form No</th>
+                    <th>Görev Yeri</th>
+                    <th>Atayan</th>
+                    <th>Durum</th>
+                    <th>Tarih</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in assignments %}
+                <tr>
+                    <td data-label="Form No">{{ item.form_no }}</td>
+                    <td data-label="Görev Yeri">{{ item.gorev_yeri or '-' }}</td>
+                    <td data-label="Atayan">{{ item.assigned_by_name or '—' }}</td>
+                    <td data-label="Durum">
+                        <span class="status-chip {{ 'complete' if item.durum == 'TAMAMLANDI' else 'partial' }}">{{ item.durum }}</span>
+                    </td>
+                    <td data-label="Tarih">{{ item.gorev_tarih or '-' }}</td>
+                    <td class="actions">
+                        <a class="button secondary" href="{{ url_for('form_summary', form_no=item.form_no) }}">Görüntüle</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">Henüz üzerinizde aktif görev bulunmuyor.</p>
+    {% endif %}
+</section>
+{% endblock %}
