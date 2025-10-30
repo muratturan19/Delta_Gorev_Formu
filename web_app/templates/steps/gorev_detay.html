@@ -15,16 +15,14 @@
 {% block content %}
 <h2>🗺️ Görev Tanımı ve Yeri</h2>
 
-{% if current_user and current_user.role in ['admin', 'atayan', 'calisan'] %}
-<div class="assignment-status {% if assigned_user %}has-assignee{% else %}no-assignee{% endif %}">
-    {% if assigned_user %}
-    <p><strong>Görevli:</strong> {{ assigned_user.full_name }}{% if assigned_by_user %} <span class="muted">(Atayan: {{ assigned_by_user.full_name }})</span>{% endif %}</p>
-    {% else %}
-    <p>Bu form için henüz görevlendirme yapılmadı.</p>
-    {% endif %}
-    {% if current_user.role in ['admin', 'atayan'] %}
-    <button type="button" class="button secondary" data-open-modal="#assign-modal">Görevlendir</button>
-    {% endif %}
+{% if responsible_name %}
+<div class="assignment-info-card" role="note">
+    <div class="assignment-info-card__icon" aria-hidden="true">ℹ️</div>
+    <div class="assignment-info-card__content">
+        <div class="assignment-info-card__title">Görev Sorumlusu</div>
+        <p class="assignment-info-card__name">{{ responsible_name }}</p>
+        <p class="assignment-info-card__note">(6. adımı dolduracak kişi)</p>
+    </div>
 </div>
 {% endif %}
 
@@ -69,56 +67,4 @@
     {% endif %}
 </form>
 
-{% if current_user and current_user.role in ['admin', 'atayan'] %}
-<div class="modal-overlay" id="assign-modal">
-    <div class="modal">
-        <h3>Görevlendir</h3>
-        <form method="post" action="{{ url_for('assign_form_route', form_no=form_no) }}" class="stacked">
-            <label for="assigned_user_id">Çalışan</label>
-            <select id="assigned_user_id" name="assigned_user_id" required>
-                <option value="">Çalışan seçin...</option>
-                {% for employee in available_employees %}
-                <option value="{{ employee.id }}" {% if assigned_user and employee.id == assigned_user.id %}selected{% endif %}>{{ employee.full_name }}</option>
-                {% endfor %}
-            </select>
-            <div class="modal-actions">
-                <button type="submit" class="button primary">Görevlendir</button>
-                <button type="button" class="button secondary" data-close-modal="#assign-modal">İptal</button>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script>
-    document.querySelectorAll('[data-open-modal]').forEach(function(button) {
-        button.addEventListener('click', function () {
-            var target = document.querySelector(button.dataset.openModal);
-            if (target) {
-                target.classList.add('is-visible');
-            }
-        });
-    });
-    document.querySelectorAll('[data-close-modal]').forEach(function(button) {
-        button.addEventListener('click', function () {
-            var target = document.querySelector(button.dataset.closeModal);
-            if (target) {
-                target.classList.remove('is-visible');
-            }
-        });
-    });
-    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
-        overlay.addEventListener('click', function (event) {
-            if (overlay.dataset.fixed === 'true') {
-                return;
-            }
-            if (event.target === overlay) {
-                overlay.classList.remove('is-visible');
-            }
-        });
-    });
-</script>
 {% endblock %}

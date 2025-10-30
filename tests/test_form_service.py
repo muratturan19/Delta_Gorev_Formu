@@ -93,6 +93,15 @@ def test_get_next_form_no_increments(tmp_path):
     assert (tmp_path / form_service.DB_FILENAME).exists()
 
 
+def test_generate_form_number_adds_prefix(tmp_path):
+    first = form_service.generate_form_number(base_path=str(tmp_path))
+    second = form_service.generate_form_number(base_path=str(tmp_path))
+
+    assert first.startswith("F-")
+    assert second.startswith("F-")
+    assert first != second
+
+
 def test_save_partial_form(tmp_path, sample_form_data):
     db_path, status = form_service.save_partial_form(
         "00042", sample_form_data, base_path=str(tmp_path)

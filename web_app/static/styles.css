@@ -1496,25 +1496,42 @@ body {
     gap: 12px;
 }
 
-.assignment-status {
-    margin-bottom: 16px;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
+.assignment-info-card {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    background: #f8fafc;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid #d0d7ff;
+    background: #eef2ff;
+    box-shadow: 0 8px 20px -12px rgba(15, 23, 42, 0.25);
+    margin-bottom: 18px;
 }
 
-.assignment-status.no-assignee {
-    background: #fff7ed;
-    border-color: #fdba74;
+.assignment-info-card__icon {
+    font-size: 1.75rem;
+    line-height: 1;
 }
 
-.assignment-status .muted {
-    color: #64748b;
+.assignment-info-card__title {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #1e3a8a;
+    margin-bottom: 4px;
+}
+
+.assignment-info-card__name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+}
+
+.assignment-info-card__note {
+    font-size: 0.95rem;
+    color: #475569;
+    margin-top: 6px;
+    margin-bottom: 0;
 }
 
 .assigned-list {

@@ -433,6 +433,13 @@ def get_next_form_no(base_path: str = ".") -> str:
     return str(next_no).zfill(5)
 
 
+def generate_form_number(base_path: str = ".") -> str:
+    """Yeni form numarasını "F-" önekiyle döndür."""
+
+    raw_number = get_next_form_no(base_path=base_path)
+    return raw_number if raw_number.startswith("F-") else f"F-{raw_number}"
+
+
 def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
     """Veritabanından form verisini iç sözlük olarak döndür."""
 
@@ -586,7 +593,16 @@ def list_form_numbers(base_path: str = ".") -> List[str]:
 
     with _connect(base_path) as connection:
         rows = connection.execute(
-            "SELECT form_no FROM forms ORDER BY CAST(form_no AS INTEGER) DESC"
+            """
+            SELECT form_no
+            FROM forms
+            ORDER BY CAST(
+                CASE
+                    WHEN form_no LIKE 'F-%' THEN SUBSTR(form_no, 3)
+                    ELSE form_no
+                END AS INTEGER
+            ) DESC
+            """
         ).fetchall()
     return [row["form_no"] for row in rows]
 
@@ -1207,6 +1223,7 @@ __all__ = [
     "export_form_to_excel",
     "export_form_to_pdf",
     "get_db_path",
+    "generate_form_number",
     "get_next_form_no",
     "get_reporting_summary",
     "list_form_numbers",
