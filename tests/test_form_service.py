@@ -20,6 +20,7 @@ def sample_form_data():
         "taseron": "ABC",
         "gorev_tanimi": "Bakım",
         "gorev_yeri": "İstanbul",
+        "gorev_tarih": "05.01.2024",
         "personel_1": "Ali",
         "personel_2": "Veli",
         "personel_3": "",
@@ -36,6 +37,21 @@ def sample_form_data():
         "mola_suresi": "30",
         "arac_plaka": "34 ABC 123",
         "hazirlayan": "Ahmet",
+        "harcama_bildirimleri": [
+            {
+                "description": "Yemek",
+                "attachments": [
+                    {
+                        "filename": "fis1.png",
+                        "original_name": "Yemek Fişi.png",
+                    }
+                ],
+            },
+            {
+                "description": "Konaklama",
+                "attachments": [],
+            },
+        ],
     }
 
 
@@ -105,6 +121,8 @@ def test_save_and_load_form(tmp_path, sample_form_data):
     assert loaded["gorev_yeri"] == sample_form_data["gorev_yeri"]
     assert loaded["durum"] == "TAMAMLANDI"
     assert loaded["last_step"] == 4
+    assert loaded["gorev_tarih"] == sample_form_data["gorev_tarih"]
+    assert loaded["harcama_bildirimleri"] == sample_form_data["harcama_bildirimleri"]
 
 
 def test_search_forms_filters(tmp_path, sample_form_data):

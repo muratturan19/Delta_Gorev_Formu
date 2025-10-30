@@ -75,8 +75,11 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             gorev_tanimi TEXT,
             gorev_yeri TEXT,
             gorev_yeri_lower TEXT,
+            gorev_tarih TEXT,
+            gorev_tarih_iso TEXT,
             yapilan_isler TEXT,
             gorev_ekleri TEXT,
+            harcama_bildirimleri TEXT,
             yola_cikis_tarih TEXT,
             yola_cikis_tarih_iso TEXT,
             yola_cikis_saat TEXT,
@@ -129,6 +132,9 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
     for column, definition in (
         ("yapilan_isler", "TEXT"),
         ("gorev_ekleri", "TEXT"),
+        ("harcama_bildirimleri", "TEXT"),
+        ("gorev_tarih", "TEXT"),
+        ("gorev_tarih_iso", "TEXT"),
         ("last_step", "INTEGER DEFAULT 0"),
     ):
         if column not in existing_columns:
@@ -196,6 +202,9 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     payload["gorev_tanimi"] = (form_data.get("gorev_tanimi") or "").strip()
     payload["gorev_yeri"] = gorev_yeri
     payload["gorev_yeri_lower"] = _normalize_for_search(gorev_yeri)
+    gorev_tarih = (form_data.get("gorev_tarih") or "").strip()
+    payload["gorev_tarih"] = gorev_tarih
+    payload["gorev_tarih_iso"] = _to_iso_date(gorev_tarih)
     payload["yapilan_isler"] = (form_data.get("yapilan_isler") or "").strip()
     payload["last_step"] = _normalize_last_step(form_data.get("last_step"))
 
@@ -218,6 +227,35 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
                     }
                 )
     payload["gorev_ekleri"] = json.dumps(attachments, ensure_ascii=False)
+
+    expenses_raw = form_data.get("harcama_bildirimleri", [])
+    expenses: List[Dict[str, Any]] = []
+    if isinstance(expenses_raw, str):
+        try:
+            parsed_expenses = json.loads(expenses_raw)
+        except json.JSONDecodeError:
+            parsed_expenses = []
+    else:
+        parsed_expenses = expenses_raw
+    if isinstance(parsed_expenses, list):
+        for item in parsed_expenses:
+            if not isinstance(item, dict):
+                continue
+            description = (item.get("description") or "").strip()
+            attachments_list: List[Dict[str, str]] = []
+            raw_attachments = item.get("attachments", [])
+            if isinstance(raw_attachments, list):
+                for attachment in raw_attachments:
+                    if isinstance(attachment, dict) and attachment.get("filename"):
+                        attachments_list.append(
+                            {
+                                "filename": attachment["filename"],
+                                "original_name": attachment.get("original_name")
+                                or attachment["filename"],
+                            }
+                        )
+            expenses.append({"description": description, "attachments": attachments_list})
+    payload["harcama_bildirimleri"] = json.dumps(expenses, ensure_ascii=False)
 
     for key in (
         "yola_cikis_tarih",
@@ -334,6 +372,7 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
         "taseron": row["taseron"] or "",
         "gorev_tanimi": row["gorev_tanimi"] or "",
         "gorev_yeri": row["gorev_yeri"] or "",
+        "gorev_tarih": row["gorev_tarih"] or "",
         "yapilan_isler": row["yapilan_isler"] or "",
         "arac_plaka": row["arac_plaka"] or "",
         "hazirlayan": row["hazirlayan"] or "",
@@ -358,6 +397,32 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
                     }
                 )
     form_data["gorev_ekleri"] = attachments
+
+    expenses_raw = row["harcama_bildirimleri"] or "[]"
+    try:
+        parsed_expenses = json.loads(expenses_raw)
+    except (TypeError, json.JSONDecodeError):
+        parsed_expenses = []
+    expenses: List[Dict[str, Any]] = []
+    if isinstance(parsed_expenses, list):
+        for item in parsed_expenses:
+            if not isinstance(item, dict):
+                continue
+            description = item.get("description") or ""
+            attachments_list: List[Dict[str, str]] = []
+            raw_attachments = item.get("attachments", [])
+            if isinstance(raw_attachments, list):
+                for attachment in raw_attachments:
+                    if isinstance(attachment, dict) and attachment.get("filename"):
+                        attachments_list.append(
+                            {
+                                "filename": attachment["filename"],
+                                "original_name": attachment.get("original_name")
+                                or attachment["filename"],
+                            }
+                        )
+            expenses.append({"description": description, "attachments": attachments_list})
+    form_data["harcama_bildirimleri"] = expenses
 
     for field in PERSONEL_FIELDS:
         form_data[field] = row[field] or ""
@@ -516,6 +581,7 @@ def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormS
     data_map: Sequence[Tuple[str, str]] = [
         ("Form No", form_no),
         ("Tarih", form_data.get("tarih", "")),
+        ("Görev Tarihi", form_data.get("gorev_tarih", "")),
         ("DOK.NO", form_data.get("dok_no", "")),
         ("REV.NO/TRH", form_data.get("rev_no", "")),
         ("", ""),
@@ -559,12 +625,30 @@ def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormS
                 attachment_names.append(original)
     attachments_text = "\n".join(attachment_names)
 
+    expense_lines: List[str] = []
+    for index, expense in enumerate(form_data.get("harcama_bildirimleri", []), 1):
+        if not isinstance(expense, dict):
+            continue
+        description = (expense.get("description") or "Açıklama belirtilmedi").strip() or "Açıklama belirtilmedi"
+        receipt_names: List[str] = []
+        for receipt in expense.get("attachments", []) or []:
+            if isinstance(receipt, dict):
+                name = receipt.get("original_name") or receipt.get("filename")
+                if name:
+                    receipt_names.append(name)
+        if receipt_names:
+            expense_lines.append(f"{index}. {description} (Ekler: {', '.join(receipt_names)})")
+        else:
+            expense_lines.append(f"{index}. {description}")
+    expenses_text = "\n".join(expense_lines)
+
     detail_map: Sequence[Tuple[str, str]] = [
         ("Avans Tutarı", form_data.get("avans", "")),
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
         ("Yapılan İşler", yapilan_isler),
+        ("Harcama Bildirimleri", expenses_text),
         ("Ekler", attachments_text),
         ("", ""),
         ("Yola Çıkış", format_datetime("yola_cikis_tarih", "yola_cikis_saat")),
@@ -642,6 +726,7 @@ def export_form_to_pdf(
     metadata = [
         ("Form No", form_no),
         ("Tarih", form_data.get("tarih", "")),
+        ("Görev Tarihi", form_data.get("gorev_tarih", "")),
         ("DOK.NO", form_data.get("dok_no", "")),
         ("REV.NO/TRH", form_data.get("rev_no", "")),
     ]
@@ -675,12 +760,30 @@ def export_form_to_pdf(
                 attachment_names.append(original)
     attachments_text = ", ".join(attachment_names)
 
+    expense_lines: List[str] = []
+    for index, expense in enumerate(form_data.get("harcama_bildirimleri", []), 1):
+        if not isinstance(expense, dict):
+            continue
+        description = (expense.get("description") or "Açıklama belirtilmedi").strip() or "Açıklama belirtilmedi"
+        receipt_names: List[str] = []
+        for receipt in expense.get("attachments", []) or []:
+            if isinstance(receipt, dict):
+                name = receipt.get("original_name") or receipt.get("filename")
+                if name:
+                    receipt_names.append(name)
+        if receipt_names:
+            expense_lines.append(f"{index}. {description} (Ekler: {', '.join(receipt_names)})")
+        else:
+            expense_lines.append(f"{index}. {description}")
+    expenses_text = "; ".join(expense_lines)
+
     sections: Iterable[Tuple[str, str]] = (
         ("Avans Tutarı", form_data.get("avans", "")),
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
         ("Yapılan İşler", yapilan_isler),
+        ("Harcama Bildirimleri", expenses_text),
         ("Ekler", attachments_text),
         ("Yola Çıkış", f"{form_data.get('yola_cikis_tarih', '')} {form_data.get('yola_cikis_saat', '')}".strip()),
         ("Dönüş", f"{form_data.get('donus_tarih', '')} {form_data.get('donus_saat', '')}".strip()),

@@ -58,6 +58,49 @@
         <label for="yapilan_isler">Yapılan İşler</label>
         <textarea id="yapilan_isler" name="yapilan_isler" rows="6" placeholder="Görev kapsamında yapılan işleri yazınız">{{ form_data.get('yapilan_isler', '') }}</textarea>
     </div>
+    <div class="form-section">
+        <h3>💸 Harcama Bildirimi</h3>
+        <div class="grid grid-2">
+            <div class="form-row">
+                <label for="harcama_aciklamasi">Harcama Açıklaması</label>
+                <input id="harcama_aciklamasi" name="harcama_aciklamasi" type="text" placeholder="Örn. Konaklama, yakıt, yemek...">
+            </div>
+            <div class="form-row">
+                <label for="harcama_dosyalari">Fiş / Görsel</label>
+                <input id="harcama_dosyalari" name="harcama_dosyalari" type="file" accept="image/*" multiple>
+                <small>Bir veya daha fazla görsel dosya seçebilirsiniz.</small>
+            </div>
+        </div>
+        <div class="form-row">
+            <button type="submit" class="button ghost" data-action="submit-step" data-value="add_expense">➕ Ekle</button>
+        </div>
+        {% if form_data.get('harcama_bildirimleri') %}
+        <ul class="attachment-list expense-list">
+            {% for expense in form_data.get('harcama_bildirimleri', []) %}
+            <li>
+                <div class="attachment-meta">
+                    <span class="attachment-name">Harcama {{ loop.index }}</span>
+                    <span>{{ expense.description or 'Açıklama belirtilmedi' }}</span>
+                    {% if expense.attachments %}
+                    <ul class="receipt-list">
+                        {% for receipt in expense.attachments %}
+                        <li>
+                            <a href="{{ url_for('download_attachment', form_no=form_no, filename=receipt.filename) }}" target="_blank">{{ receipt.original_name }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <small>Görsel eklenmedi.</small>
+                    {% endif %}
+                </div>
+                <div class="attachment-actions">
+                    <button type="submit" class="button danger small" name="remove_expense" value="{{ loop.index0 }}" data-action="submit-step" data-value="remove_expense">Sil</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
     <div class="form-row">
         <label for="gorev_ekleri">Görev Ekleri</label>
         <input id="gorev_ekleri" name="gorev_ekleri" type="file" multiple>

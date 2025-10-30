@@ -544,6 +544,71 @@ body {
     font-weight: 600;
 }
 
+.form-section {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 28px 0;
+    background: rgba(13, 71, 161, 0.04);
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+}
+
+.expense-list .attachment-meta span:last-of-type {
+    color: #4b5563;
+}
+
+.receipt-list {
+    list-style: disc;
+    margin: 8px 0 0 18px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.receipt-list li {
+    margin: 0;
+    padding: 0;
+}
+
+.receipt-list a {
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.expense-summary-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.expense-summary-list > li > span {
+    display: inline-block;
+    margin-left: 6px;
+}
+
+.expense-summary-list > li > ul {
+    list-style: disc;
+    margin: 6px 0 0 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.expense-summary-list a {
+    color: var(--primary);
+    font-weight: 500;
+}
+
 .grid {
     display: grid;
     gap: 18px;

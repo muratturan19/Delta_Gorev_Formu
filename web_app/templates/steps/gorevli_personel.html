@@ -16,6 +16,10 @@
 <h2>👥 Görevli Personel</h2>
 <form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
     <input type="hidden" name="action" value="next">
+    <div class="form-row">
+        <label for="gorev_tarih">Görev Tarihi</label>
+        <input id="gorev_tarih" name="gorev_tarih" type="date" value="{{ form_data.get('gorev_tarih', '') | to_html_date }}">
+    </div>
     {% for index in range(1, 6) %}
     <div class="form-row">
         <label for="personel_{{ index }}">Personel {{ index }}</label>
