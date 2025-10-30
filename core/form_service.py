@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import sqlite3
 import unicodedata
@@ -74,6 +75,8 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             gorev_tanimi TEXT,
             gorev_yeri TEXT,
             gorev_yeri_lower TEXT,
+            yapilan_isler TEXT,
+            gorev_ekleri TEXT,
             yola_cikis_tarih TEXT,
             yola_cikis_tarih_iso TEXT,
             yola_cikis_saat TEXT,
@@ -118,6 +121,13 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
     connection.execute(
         "INSERT OR IGNORE INTO form_sequence (id, last_no) VALUES (1, 0)"
     )
+
+    existing_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(forms)")
+    }
+    for column, definition in ("yapilan_isler", "TEXT"), ("gorev_ekleri", "TEXT"):
+        if column not in existing_columns:
+            connection.execute(f"ALTER TABLE forms ADD COLUMN {column} {definition}")
 
 
 def determine_form_status(form_data: Dict[str, Any]) -> FormStatus:
@@ -181,6 +191,27 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     payload["gorev_tanimi"] = (form_data.get("gorev_tanimi") or "").strip()
     payload["gorev_yeri"] = gorev_yeri
     payload["gorev_yeri_lower"] = _normalize_for_search(gorev_yeri)
+    payload["yapilan_isler"] = (form_data.get("yapilan_isler") or "").strip()
+
+    attachments_raw = form_data.get("gorev_ekleri", [])
+    attachments: List[Dict[str, str]] = []
+    if isinstance(attachments_raw, str):
+        try:
+            parsed = json.loads(attachments_raw)
+        except json.JSONDecodeError:
+            parsed = []
+    else:
+        parsed = attachments_raw
+    if isinstance(parsed, list):
+        for item in parsed:
+            if isinstance(item, dict) and "filename" in item:
+                attachments.append(
+                    {
+                        "filename": item["filename"],
+                        "original_name": item.get("original_name") or item["filename"],
+                    }
+                )
+    payload["gorev_ekleri"] = json.dumps(attachments, ensure_ascii=False)
 
     for key in (
         "yola_cikis_tarih",
@@ -286,11 +317,29 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
         "taseron": row["taseron"] or "",
         "gorev_tanimi": row["gorev_tanimi"] or "",
         "gorev_yeri": row["gorev_yeri"] or "",
+        "yapilan_isler": row["yapilan_isler"] or "",
         "arac_plaka": row["arac_plaka"] or "",
         "hazirlayan": row["hazirlayan"] or "",
         "durum": (row["durum"] or "YARIM").upper(),
         "mola_suresi": row["mola_suresi"] or "",
     }
+
+    attachments_raw = row["gorev_ekleri"] or "[]"
+    try:
+        parsed = json.loads(attachments_raw)
+    except (TypeError, json.JSONDecodeError):
+        parsed = []
+    attachments: List[Dict[str, str]] = []
+    if isinstance(parsed, list):
+        for item in parsed:
+            if isinstance(item, dict) and "filename" in item:
+                attachments.append(
+                    {
+                        "filename": item["filename"],
+                        "original_name": item.get("original_name") or item["filename"],
+                    }
+                )
+    form_data["gorev_ekleri"] = attachments
 
     for field in PERSONEL_FIELDS:
         form_data[field] = row[field] or ""
@@ -483,12 +532,22 @@ def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormS
 
     mola = (form_data.get("mola_suresi") or "").strip()
     mola_text = f"{mola} dakika" if mola else ""
+    yapilan_isler = (form_data.get("yapilan_isler") or "").strip()
+    attachment_names = []
+    for item in form_data.get("gorev_ekleri", []):
+        if isinstance(item, dict):
+            original = item.get("original_name")
+            if original:
+                attachment_names.append(original)
+    attachments_text = "\n".join(attachment_names)
 
     detail_map: Sequence[Tuple[str, str]] = [
         ("Avans Tutarı", form_data.get("avans", "")),
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
+        ("Yapılan İşler", yapilan_isler),
+        ("Ekler", attachments_text),
         ("", ""),
         ("Yola Çıkış", format_datetime("yola_cikis_tarih", "yola_cikis_saat")),
         ("Dönüş", format_datetime("donus_tarih", "donus_saat")),
@@ -589,11 +648,22 @@ def export_form_to_pdf(
         y_position -= 0.5 * cm
 
     y_position -= 0.2 * cm
+    yapilan_isler = (form_data.get("yapilan_isler") or "").strip()
+    attachment_names = []
+    for item in form_data.get("gorev_ekleri", []):
+        if isinstance(item, dict):
+            original = item.get("original_name")
+            if original:
+                attachment_names.append(original)
+    attachments_text = ", ".join(attachment_names)
+
     sections: Iterable[Tuple[str, str]] = (
         ("Avans Tutarı", form_data.get("avans", "")),
         ("Taşeron Şirket", form_data.get("taseron", "")),
         ("Görevin Tanımı", form_data.get("gorev_tanimi", "")),
         ("Görev Yeri", form_data.get("gorev_yeri", "")),
+        ("Yapılan İşler", yapilan_isler),
+        ("Ekler", attachments_text),
         ("Yola Çıkış", f"{form_data.get('yola_cikis_tarih', '')} {form_data.get('yola_cikis_saat', '')}".strip()),
         ("Dönüş", f"{form_data.get('donus_tarih', '')} {form_data.get('donus_saat', '')}".strip()),
         (

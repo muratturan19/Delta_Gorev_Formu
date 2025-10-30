@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Form {{ form_no }} · Avans ve Taşeron{% endblock %}
+{% block title %}Form {{ form_no }} · Görev Tanımı ve Yeri{% endblock %}
 
 {% block steps %}
 <div class="step-indicator">
@@ -13,21 +13,18 @@
 {% endblock %}
 
 {% block content %}
-<h2>💰 Avans ve Taşeron Bilgileri</h2>
-<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
+<h2>🗺️ Görev Tanımı ve Yeri</h2>
+<form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card form-scroll">
     <input type="hidden" name="action" value="next">
-    <div class="form-row">
-        <label for="avans">Avans Tutarı</label>
-        <input id="avans" name="avans" type="text" value="{{ form_data.get('avans', '') }}" placeholder="Örn. 1500 TL">
-    </div>
-    <div class="form-row">
-        <label for="taseron">Taşeron Şirket</label>
-        <select id="taseron" name="taseron">
-            <option value="">Seçiniz</option>
-            {% for option in taseron_options %}
-                <option value="{{ option }}" {% if form_data.get('taseron') == option %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
+    <div class="stacked">
+        <div class="form-row">
+            <label for="gorev_tanimi">Görevin Tanımı</label>
+            <textarea id="gorev_tanimi" name="gorev_tanimi" rows="8" placeholder="Görevin kapsamını ayrıntılı şekilde yazınız">{{ form_data.get('gorev_tanimi', '') }}</textarea>
+        </div>
+        <div class="form-row">
+            <label for="gorev_yeri">Görev Yeri</label>
+            <textarea id="gorev_yeri" name="gorev_yeri" rows="6" placeholder="Görev konumu ve saha bilgilerini yazınız">{{ form_data.get('gorev_yeri', '') }}</textarea>
+        </div>
     </div>
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>

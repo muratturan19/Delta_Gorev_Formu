@@ -6,22 +6,25 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+from uuid import uuid4
 
 from flask import (Flask, flash, redirect, render_template, request, send_file,
-                   session, url_for)
+                   send_from_directory, session, url_for)
+from werkzeug.utils import secure_filename
 
 from core import form_service
 from core.form_service import FormServiceError
 
 BASE_PATH = Path(__file__).resolve().parents[1]
 DATA_FILE = BASE_PATH / "data.json"
-DEFAULT_FORM_VALUES: Dict[str, str] = {
+DEFAULT_FORM_VALUES: Dict[str, Any] = {
     "dok_no": "F-001",
     "rev_no": "00 / 06.05.24",
     "avans": "",
     "taseron": "",
     "gorev_tanimi": "",
     "gorev_yeri": "",
+    "yapilan_isler": "",
     "yola_cikis_tarih": "",
     "yola_cikis_saat": "",
     "donus_tarih": "",
@@ -34,6 +37,7 @@ DEFAULT_FORM_VALUES: Dict[str, str] = {
     "arac_plaka": "",
     "hazirlayan": "",
     "durum": "YARIM",
+    "gorev_ekleri": [],
 }
 DEFAULT_FORM_VALUES.update({f"personel_{index}": "" for index in range(1, 6)})
 
@@ -98,6 +102,8 @@ DEFAULT_FORM_DEFAULTS: Dict[str, str] = {
     "rev_no": "00 / 06.05.24",
 }
 
+UPLOAD_DIR = BASE_PATH / "uploads"
+
 _storage: Dict[str, Any] | None = None
 _dynamic_data: Dict[str, List[str]] | None = None
 _form_defaults: Dict[str, str] | None = None
@@ -105,13 +111,11 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PANEL_PASSWORD") or os.environ.get("ADMIN
 
 FORM_STEPS: List[Dict[str, str]] = [
     {"id": "form_bilgileri", "title": "Form Bilgileri", "template": "steps/form_bilgileri.html"},
-    {"id": "gorevli_personel", "title": "Görevli Personel", "template": "steps/gorevli_personel.html"},
-    {"id": "avans_taseron", "title": "Avans ve Taşeron", "template": "steps/avans_taseron.html"},
-    {"id": "gorev_tanimi", "title": "Görev Tanımı", "template": "steps/gorev_tanimi.html"},
-    {"id": "gorev_yeri", "title": "Görev Yeri", "template": "steps/gorev_yeri.html"},
-    {"id": "saat_bilgileri", "title": "Saat Bilgileri", "template": "steps/saat_bilgileri.html"},
-    {"id": "arac_bilgisi", "title": "Araç Bilgisi", "template": "steps/arac_bilgisi.html"},
     {"id": "hazirlayan", "title": "Hazırlayan", "template": "steps/hazirlayan.html"},
+    {"id": "gorevli_personel", "title": "Görevli Personel", "template": "steps/gorevli_personel.html"},
+    {"id": "finans_arac", "title": "Avans ve Araç Bilgileri", "template": "steps/finans_arac.html"},
+    {"id": "gorev_detay", "title": "Görev Tanımı ve Yeri", "template": "steps/gorev_detay.html"},
+    {"id": "gorev_bilgileri", "title": "Görev Bilgileri", "template": "steps/gorev_bilgileri.html"},
 ]
 
 
@@ -247,6 +251,51 @@ def register_routes(app: Flask) -> None:
     def is_admin() -> bool:
         return bool(session.get("is_admin"))
 
+    def normalize_attachments(form_data: Dict[str, Any]) -> List[Dict[str, str]]:
+        attachments = form_data.get("gorev_ekleri", [])
+        normalized: List[Dict[str, str]] = []
+        if isinstance(attachments, list):
+            for item in attachments:
+                if isinstance(item, dict) and "filename" in item:
+                    normalized.append(
+                        {
+                            "filename": item["filename"],
+                            "original_name": item.get("original_name") or item["filename"],
+                        }
+                    )
+        form_data["gorev_ekleri"] = normalized
+        return normalized
+
+    def save_uploaded_files(form_no: str, files) -> List[Dict[str, str]]:
+        if not files:
+            return []
+        uploaded: List[Dict[str, str]] = []
+        for file in files.getlist("gorev_ekleri"):
+            if not file or not file.filename:
+                continue
+            filename = secure_filename(file.filename)
+            if not filename:
+                continue
+            unique_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}_{filename}"
+            target_dir = UPLOAD_DIR / form_no
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_path = target_dir / unique_name
+            file.save(target_path)
+            uploaded.append({"filename": unique_name, "original_name": file.filename})
+        return uploaded
+
+    def delete_attachment_file(form_no: str, filename: str) -> bool:
+        if not filename:
+            return False
+        target_path = UPLOAD_DIR / form_no / filename
+        if not target_path.exists():
+            return False
+        try:
+            target_path.unlink()
+        except OSError:
+            return False
+        return True
+
     def ensure_admin_access():
         if not is_admin():
             flash("Admin paneline erişmek için giriş yapın.", "error")
@@ -368,6 +417,7 @@ def register_routes(app: Flask) -> None:
             "dok_no": form_defaults["dok_no"],
             "rev_no": form_defaults["rev_no"],
         }
+        form_data["gorev_ekleri"] = []
         store_form_in_session(form_no, form_data)
         flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
         return redirect(url_for("form_wizard", form_no=form_no, step=0))
@@ -387,7 +437,35 @@ def register_routes(app: Flask) -> None:
         current_step = FORM_STEPS[step]
 
         if request.method == "POST":
-            update_form_data_from_request(form_data, current_step["id"], request.form)
+            remove_target = ""
+            if current_step["id"] == "gorev_bilgileri":
+                remove_target = request.form.get("remove_attachment", "").strip()
+
+            update_form_data_from_request(
+                form_no,
+                form_data,
+                current_step["id"],
+                request.form,
+                request.files,
+            )
+            attachments = normalize_attachments(form_data)
+
+            if remove_target:
+                remaining = [item for item in attachments if item["filename"] != remove_target]
+                if len(remaining) != len(attachments):
+                    form_data["gorev_ekleri"] = remaining
+                    file_deleted = delete_attachment_file(form_no, remove_target)
+                    message = "Ek kaldırıldı."
+                    category = "info"
+                    if not file_deleted:
+                        message = "Ek listeden kaldırıldı ancak dosya bulunamadı."
+                        category = "warning"
+                    flash(message, category)
+                else:
+                    flash("Silinecek ek bulunamadı.", "warning")
+                store_form_in_session(form_no, form_data)
+                return redirect(url_for("form_wizard", form_no=form_no, step=step))
+
             store_form_in_session(form_no, form_data)
 
             action = request.form.get("action")
@@ -465,6 +543,31 @@ def register_routes(app: Flask) -> None:
             status=status,
             missing_fields=missing_fields,
             locked=locked,
+        )
+
+    @app.get("/form/<form_no>/attachments/<path:filename>")
+    def download_attachment(form_no: str, filename: str):
+        form_data = ensure_form_data(form_no)
+        if form_data is None:
+            flash(f"Form {form_no} yüklenemedi.", "error")
+            return redirect(url_for("index"))
+
+        attachments = form_data.get("gorev_ekleri") or []
+        original_name = next(
+            (item.get("original_name") for item in attachments if item.get("filename") == filename),
+            filename,
+        )
+
+        file_path = UPLOAD_DIR / form_no / filename
+        if not file_path.exists():
+            flash("Dosya bulunamadı.", "error")
+            return redirect(url_for("form_summary", form_no=form_no))
+
+        return send_from_directory(
+            file_path.parent,
+            file_path.name,
+            as_attachment=True,
+            download_name=original_name,
         )
 
     @app.route("/admin", methods=["GET", "POST"])
@@ -587,6 +690,7 @@ def register_routes(app: Flask) -> None:
         forms = session.get("forms", {})
         form_data = forms.get(form_no)
         if form_data:
+            normalize_attachments(form_data)
             return form_data
         try:
             loaded = form_service.load_form_data(form_no, base_path=str(BASE_PATH))
@@ -594,10 +698,12 @@ def register_routes(app: Flask) -> None:
             flash(str(exc), "error")
             return None
         else:
+            normalize_attachments(loaded)
             store_form_in_session(form_no, loaded)
             return loaded
 
-    def store_form_in_session(form_no: str, form_data: Dict[str, str]) -> None:
+    def store_form_in_session(form_no: str, form_data: Dict[str, Any]) -> None:
+        normalize_attachments(form_data)
         forms = session.get("forms", {})
         forms[form_no] = form_data
         session["forms"] = forms
@@ -624,24 +730,32 @@ def register_routes(app: Flask) -> None:
         except ValueError:
             return value
 
-    def update_form_data_from_request(form_data: Dict[str, str], step_id: str, data) -> None:
+    def update_form_data_from_request(
+        form_no: str,
+        form_data: Dict[str, Any],
+        step_id: str,
+        data,
+        files,
+    ) -> None:
         if step_id == "form_bilgileri":
             form_data["dok_no"] = data.get("dok_no", "").strip()
             form_data["rev_no"] = data.get("rev_no", "").strip()
             tarih = data.get("tarih", "").strip()
             if tarih:
                 form_data["tarih"] = tarih
+        elif step_id == "hazirlayan":
+            form_data["hazirlayan"] = data.get("hazirlayan", "").strip()
         elif step_id == "gorevli_personel":
             for index in range(1, 6):
                 form_data[f"personel_{index}"] = data.get(f"personel_{index}", "").strip()
-        elif step_id == "avans_taseron":
+        elif step_id == "finans_arac":
             form_data["avans"] = data.get("avans", "").strip()
             form_data["taseron"] = data.get("taseron", "").strip()
-        elif step_id == "gorev_tanimi":
+            form_data["arac_plaka"] = data.get("arac_plaka", "").strip()
+        elif step_id == "gorev_detay":
             form_data["gorev_tanimi"] = data.get("gorev_tanimi", "").strip()
-        elif step_id == "gorev_yeri":
             form_data["gorev_yeri"] = data.get("gorev_yeri", "").strip()
-        elif step_id == "saat_bilgileri":
+        elif step_id == "gorev_bilgileri":
             date_fields = [
                 "yola_cikis_tarih",
                 "donus_tarih",
@@ -660,10 +774,14 @@ def register_routes(app: Flask) -> None:
             for field in time_fields:
                 form_data[field] = normalize_time(data.get(field, ""))
             form_data["mola_suresi"] = data.get("mola_suresi", "").strip()
-        elif step_id == "arac_bilgisi":
-            form_data["arac_plaka"] = data.get("arac_plaka", "").strip()
-        elif step_id == "hazirlayan":
-            form_data["hazirlayan"] = data.get("hazirlayan", "").strip()
+            form_data["yapilan_isler"] = data.get("yapilan_isler", "").strip()
+            existing = form_data.get("gorev_ekleri")
+            if not isinstance(existing, list):
+                existing = []
+            uploads = save_uploaded_files(form_no, files)
+            if uploads:
+                existing.extend(uploads)
+            form_data["gorev_ekleri"] = existing
 
     app.jinja_env.globals.update(
         FIELD_LABELS=FIELD_LABELS,
