@@ -558,8 +558,15 @@ def register_routes(app: Flask) -> None:
             filename,
         )
 
-        file_path = UPLOAD_DIR / form_no / filename
-        if not file_path.exists():
+        base_dir = (UPLOAD_DIR / form_no).resolve()
+        try:
+            file_path = (base_dir / filename).resolve()
+            file_path.relative_to(base_dir)
+        except (ValueError, RuntimeError):
+            flash("Dosya bulunamadı.", "error")
+            return redirect(url_for("form_summary", form_no=form_no))
+
+        if not file_path.exists() or not file_path.is_file():
             flash("Dosya bulunamadı.", "error")
             return redirect(url_for("form_summary", form_no=form_no))
 
