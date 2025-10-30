@@ -99,6 +99,7 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             personel_4 TEXT,
             personel_5 TEXT,
             personel_search TEXT,
+            last_step INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -125,7 +126,11 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
     existing_columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(forms)")
     }
-    for column, definition in ("yapilan_isler", "TEXT"), ("gorev_ekleri", "TEXT"):
+    for column, definition in (
+        ("yapilan_isler", "TEXT"),
+        ("gorev_ekleri", "TEXT"),
+        ("last_step", "INTEGER DEFAULT 0"),
+    ):
         if column not in existing_columns:
             connection.execute(f"ALTER TABLE forms ADD COLUMN {column} {definition}")
 
@@ -192,6 +197,7 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     payload["gorev_yeri"] = gorev_yeri
     payload["gorev_yeri_lower"] = _normalize_for_search(gorev_yeri)
     payload["yapilan_isler"] = (form_data.get("yapilan_isler") or "").strip()
+    payload["last_step"] = _normalize_last_step(form_data.get("last_step"))
 
     attachments_raw = form_data.get("gorev_ekleri", [])
     attachments: List[Dict[str, str]] = []
@@ -241,6 +247,14 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
 
     payload["personel_search"] = ",".join(personel_values)
     return payload
+
+
+def _normalize_last_step(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, numeric)
 
 
 def _persist_form(
@@ -308,6 +322,9 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
     if row is None:
         raise FormServiceError(f"Form {form_no} bulunamadı.")
 
+    row_keys = row.keys()
+    last_step_value = row["last_step"] if "last_step" in row_keys else 0
+
     form_data: Dict[str, Any] = {
         "form_no": form_no,
         "tarih": row["tarih"] or "",
@@ -322,6 +339,7 @@ def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
         "hazirlayan": row["hazirlayan"] or "",
         "durum": (row["durum"] or "YARIM").upper(),
         "mola_suresi": row["mola_suresi"] or "",
+        "last_step": _normalize_last_step(last_step_value),
     }
 
     attachments_raw = row["gorev_ekleri"] or "[]"
