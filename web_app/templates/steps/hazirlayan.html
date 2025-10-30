@@ -16,19 +16,27 @@
 <h2>✍️ Hazırlayan / Görevlendiren</h2>
 <form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card">
     <input type="hidden" name="action" value="next">
-    <div class="form-row">
-        <label for="hazirlayan">Hazırlayan</label>
-        <select id="hazirlayan" name="hazirlayan">
-            <option value="">Seçiniz</option>
-            {% for option in hazirlayan_options %}
-                <option value="{{ option }}" {% if form_data.get('hazirlayan') == option %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
+    <fieldset class="form-fields" {% if read_only_step %}disabled{% endif %}>
+        <div class="form-row">
+            <label for="hazirlayan">Hazırlayan</label>
+            <select id="hazirlayan" name="hazirlayan">
+                <option value="">Seçiniz</option>
+                {% for option in hazirlayan_options %}
+                    <option value="{{ option }}" {% if form_data.get('hazirlayan') == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </fieldset>
+    {% if is_employee and read_only_step %}
+    <div class="form-actions single">
+        <a class="button primary" href="{{ url_for('form_wizard', form_no=form_no, step=5) }}">Görev Bilgilerini Doldur →</a>
     </div>
+    {% else %}
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
         <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
         <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
     </div>
+    {% endif %}
 </form>
 {% endblock %}

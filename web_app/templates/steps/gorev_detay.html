@@ -14,36 +14,111 @@
 
 {% block content %}
 <h2>🗺️ Görev Tanımı ve Yeri</h2>
+
+{% if current_user and current_user.role in ['admin', 'atayan', 'calisan'] %}
+<div class="assignment-status {% if assigned_user %}has-assignee{% else %}no-assignee{% endif %}">
+    {% if assigned_user %}
+    <p><strong>Görevli:</strong> {{ assigned_user.full_name }}{% if assigned_by_user %} <span class="muted">(Atayan: {{ assigned_by_user.full_name }})</span>{% endif %}</p>
+    {% else %}
+    <p>Bu form için henüz görevlendirme yapılmadı.</p>
+    {% endif %}
+    {% if current_user.role in ['admin', 'atayan'] %}
+    <button type="button" class="button secondary" data-open-modal="#assign-modal">Görevlendir</button>
+    {% endif %}
+</div>
+{% endif %}
+
 <form method="post" action="{{ url_for('form_wizard', form_no=form_no, step=step_index) }}" class="form-card form-scroll">
     <input type="hidden" name="action" value="next">
-    <div class="stacked">
-        <div class="form-row">
-            <label for="gorev_tanimi">Görevin Tanımı</label>
-            <textarea id="gorev_tanimi" name="gorev_tanimi" rows="8" placeholder="Görevin kapsamını ayrıntılı şekilde yazınız">{{ form_data.get('gorev_tanimi', '') }}</textarea>
-        </div>
-        <div class="form-row">
-            <label for="gorev_yeri">Görev Yeri</label>
-            <textarea id="gorev_yeri" name="gorev_yeri" rows="6" placeholder="Görev konumu ve saha bilgilerini yazınız">{{ form_data.get('gorev_yeri', '') }}</textarea>
-        </div>
-        <div class="grid grid-3">
+    <fieldset class="form-fields" {% if read_only_step %}disabled{% endif %}>
+        <div class="stacked">
             <div class="form-row">
-                <label for="gorev_il">Görev İli <small>(opsiyonel)</small></label>
-                <input id="gorev_il" name="gorev_il" type="text" value="{{ form_data.get('gorev_il', '') }}" placeholder="Örn. İstanbul">
+                <label for="gorev_tanimi">Görevin Tanımı</label>
+                <textarea id="gorev_tanimi" name="gorev_tanimi" rows="8" placeholder="Görevin kapsamını ayrıntılı şekilde yazınız">{{ form_data.get('gorev_tanimi', '') }}</textarea>
             </div>
             <div class="form-row">
-                <label for="gorev_ilce">Görev İlçesi <small>(opsiyonel)</small></label>
-                <input id="gorev_ilce" name="gorev_ilce" type="text" value="{{ form_data.get('gorev_ilce', '') }}" placeholder="Örn. Ataşehir">
+                <label for="gorev_yeri">Görev Yeri</label>
+                <textarea id="gorev_yeri" name="gorev_yeri" rows="6" placeholder="Görev konumu ve saha bilgilerini yazınız">{{ form_data.get('gorev_yeri', '') }}</textarea>
             </div>
-            <div class="form-row">
-                <label for="gorev_firma">Ziyaret Edilen Firma / Lokasyon <small>(opsiyonel)</small></label>
-                <input id="gorev_firma" name="gorev_firma" type="text" value="{{ form_data.get('gorev_firma', '') }}" placeholder="Örn. Delta Proje Şantiyesi">
+            <div class="grid grid-3">
+                <div class="form-row">
+                    <label for="gorev_il">Görev İli <small>(opsiyonel)</small></label>
+                    <input id="gorev_il" name="gorev_il" type="text" value="{{ form_data.get('gorev_il', '') }}" placeholder="Örn. İstanbul">
+                </div>
+                <div class="form-row">
+                    <label for="gorev_ilce">Görev İlçesi <small>(opsiyonel)</small></label>
+                    <input id="gorev_ilce" name="gorev_ilce" type="text" value="{{ form_data.get('gorev_ilce', '') }}" placeholder="Örn. Ataşehir">
+                </div>
+                <div class="form-row">
+                    <label for="gorev_firma">Ziyaret Edilen Firma / Lokasyon <small>(opsiyonel)</small></label>
+                    <input id="gorev_firma" name="gorev_firma" type="text" value="{{ form_data.get('gorev_firma', '') }}" placeholder="Örn. Delta Proje Şantiyesi">
+                </div>
             </div>
         </div>
+    </fieldset>
+    {% if is_employee and read_only_step %}
+    <div class="form-actions single">
+        <a class="button primary" href="{{ url_for('form_wizard', form_no=form_no, step=5) }}">Görev Bilgilerini Doldur →</a>
     </div>
+    {% else %}
     <div class="form-actions">
         <button type="submit" class="button secondary" data-action="submit-step" data-value="previous">← Geri</button>
         <button type="submit" class="button save" data-action="submit-step" data-value="save">💾 Kaydet</button>
         <button type="submit" class="button primary" data-action="submit-step" data-value="next">İleri →</button>
     </div>
+    {% endif %}
 </form>
+
+{% if current_user and current_user.role in ['admin', 'atayan'] %}
+<div class="modal-overlay" id="assign-modal">
+    <div class="modal">
+        <h3>Görevlendir</h3>
+        <form method="post" action="{{ url_for('assign_form_route', form_no=form_no) }}" class="stacked">
+            <label for="assigned_user_id">Çalışan</label>
+            <select id="assigned_user_id" name="assigned_user_id" required>
+                <option value="">Çalışan seçin...</option>
+                {% for employee in available_employees %}
+                <option value="{{ employee.id }}" {% if assigned_user and employee.id == assigned_user.id %}selected{% endif %}>{{ employee.full_name }}</option>
+                {% endfor %}
+            </select>
+            <div class="modal-actions">
+                <button type="submit" class="button primary">Görevlendir</button>
+                <button type="button" class="button secondary" data-close-modal="#assign-modal">İptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.querySelectorAll('[data-open-modal]').forEach(function(button) {
+        button.addEventListener('click', function () {
+            var target = document.querySelector(button.dataset.openModal);
+            if (target) {
+                target.classList.add('is-visible');
+            }
+        });
+    });
+    document.querySelectorAll('[data-close-modal]').forEach(function(button) {
+        button.addEventListener('click', function () {
+            var target = document.querySelector(button.dataset.closeModal);
+            if (target) {
+                target.classList.remove('is-visible');
+            }
+        });
+    });
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+        overlay.addEventListener('click', function (event) {
+            if (overlay.dataset.fixed === 'true') {
+                return;
+            }
+            if (event.target === overlay) {
+                overlay.classList.remove('is-visible');
+            }
+        });
+    });
+</script>
 {% endblock %}

@@ -12,8 +12,9 @@ from flask import (Flask, flash, redirect, render_template, request, send_file,
                    send_from_directory, session, url_for)
 from werkzeug.utils import secure_filename
 
-from core import form_service
+from core import form_service, user_service
 from core.form_service import FormServiceError
+from core.user_service import UserServiceError
 
 BASE_PATH = Path(__file__).resolve().parents[1]
 DATA_FILE = BASE_PATH / "data.json"
@@ -45,6 +46,13 @@ DEFAULT_FORM_VALUES: Dict[str, Any] = {
     "harcama_bildirimleri": [],
 }
 DEFAULT_FORM_VALUES.update({f"personel_{index}": "" for index in range(1, 6)})
+DEFAULT_FORM_VALUES.update(
+    {
+        "assigned_to_user_id": None,
+        "assigned_by_user_id": None,
+        "assigned_at": None,
+    }
+)
 
 FIELD_LABELS: Dict[str, str] = {
     "dok_no": "DOK.NO",
@@ -250,6 +258,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
+    user_service.ensure_default_users(base_path=str(BASE_PATH))
     register_routes(app)
     return app
 
@@ -257,8 +266,47 @@ def create_app() -> Flask:
 def register_routes(app: Flask) -> None:
     total_steps = len(FORM_STEPS)
 
-    def is_admin() -> bool:
-        return bool(session.get("is_admin"))
+    def get_current_user() -> Dict[str, Any] | None:
+        user_data = session.get("user")
+        if not isinstance(user_data, dict):
+            return None
+        return user_data
+
+    def current_role() -> str | None:
+        user_data = get_current_user()
+        if not user_data:
+            return None
+        return user_data.get("role")
+
+    def has_role(*roles: str) -> bool:
+        role = current_role()
+        return role in roles if role else False
+
+    def require_roles(*roles: str):
+        response = require_login()
+        if response is not None:
+            return response
+        if not has_role(*roles):
+            flash("Bu işlemi gerçekleştirmek için yetkiniz yok.", "error")
+            return redirect(url_for("index"))
+        return None
+
+    def require_login():
+        if get_current_user() is None:
+            flash("Lütfen önce kendinizi seçin.", "warning")
+            return redirect(url_for("index"))
+        return None
+
+    def set_session_user(user_obj) -> None:
+        session["user"] = {
+            "id": user_obj.id,
+            "full_name": user_obj.full_name,
+            "email": user_obj.email,
+            "role": user_obj.role,
+        }
+
+    def clear_session_user() -> None:
+        session.pop("user", None)
 
     def normalize_expense_entries(form_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         entries = form_data.get("harcama_bildirimleri", [])
@@ -335,9 +383,12 @@ def register_routes(app: Flask) -> None:
         return True
 
     def ensure_admin_access():
-        if not is_admin():
-            flash("Admin paneline erişmek için giriş yapın.", "error")
-            return redirect(url_for("admin_panel"))
+        response = require_login()
+        if response is not None:
+            return response
+        if not has_role("admin"):
+            flash("Bu bölüme yalnızca admin kullanıcılar erişebilir.", "error")
+            return redirect(url_for("index"))
         return None
 
     @app.template_filter("to_html_date")
@@ -355,6 +406,10 @@ def register_routes(app: Flask) -> None:
         return value
 
     @app.context_processor
+    def inject_user():  # pragma: no cover - template helper
+        return {"current_user": get_current_user()}
+
+    @app.context_processor
     def inject_globals():  # pragma: no cover - template helper
         dynamic_data = get_dynamic_data()
         return {
@@ -364,7 +419,7 @@ def register_routes(app: Flask) -> None:
             "taseron_options": dynamic_data["taseron_options"],
             "hazirlayan_options": dynamic_data["hazirlayan_options"],
             "arac_plaka_options": dynamic_data["arac_plaka_options"],
-            "is_admin": is_admin(),
+            "is_admin": has_role("admin"),
         }
 
     def get_locked_forms() -> List[str]:
@@ -389,7 +444,10 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/")
     def index():
-        form_numbers = form_service.list_form_numbers(base_path=str(BASE_PATH))
+        current = get_current_user()
+        all_users = user_service.list_users(base_path=str(BASE_PATH))
+        pending_login = session.get("pending_login")
+        show_password_modal = session.pop("show_password_modal", False)
 
         filters = {
             "personel": request.args.get("personel", "").strip(),
@@ -398,16 +456,28 @@ def register_routes(app: Flask) -> None:
             "end_date": request.args.get("end_date", "").strip(),
         }
 
-        performed_search = any(filters.values())
-        search_results = []
-        if performed_search:
-            search_results = form_service.search_forms(
-                person=filters["personel"],
-                location=filters["gorev_yeri"],
-                start_date=filters["start_date"],
-                end_date=filters["end_date"],
-                base_path=str(BASE_PATH),
+        form_numbers: List[str] = []
+        search_results: List[Dict[str, Any]] = []
+        performed_search = False
+        assigned_forms: List[Dict[str, Any]] = []
+
+        if current and current.get("role") == "calisan":
+            filters = {key: "" for key in filters}
+            assigned_forms = form_service.list_forms_for_assignee(
+                current.get("id"), base_path=str(BASE_PATH)
             )
+            form_numbers = [item["form_no"] for item in assigned_forms]
+        else:
+            form_numbers = form_service.list_form_numbers(base_path=str(BASE_PATH))
+            performed_search = any(filters.values())
+            if performed_search:
+                search_results = form_service.search_forms(
+                    person=filters["personel"],
+                    location=filters["gorev_yeri"],
+                    start_date=filters["start_date"],
+                    end_date=filters["end_date"],
+                    base_path=str(BASE_PATH),
+                )
 
         return render_template(
             "home.html",
@@ -415,10 +485,77 @@ def register_routes(app: Flask) -> None:
             search_filters=filters,
             search_results=search_results,
             performed_search=performed_search,
+            login_users=all_users,
+            assigned_forms=assigned_forms,
+            pending_login=pending_login,
+            show_password_modal=show_password_modal,
         )
+
+    @app.post("/login/select")
+    def login_select():
+        user_id_raw = request.form.get("user_id", "").strip()
+        if not user_id_raw.isdigit():
+            flash("Lütfen bir kullanıcı seçin.", "warning")
+            return redirect(url_for("index"))
+
+        user_obj = user_service.get_user(int(user_id_raw), base_path=str(BASE_PATH))
+        if user_obj is None or not user_obj.is_active:
+            flash("Seçilen kullanıcı bulunamadı veya aktif değil.", "error")
+            return redirect(url_for("index"))
+
+        session.pop("pending_login", None)
+
+        if user_obj.role == "calisan":
+            set_session_user(user_obj)
+            session.pop("show_password_modal", None)
+            flash(f"Hoş geldiniz {user_obj.full_name}!", "success")
+            return redirect(url_for("index"))
+
+        session["pending_login"] = {"id": user_obj.id, "full_name": user_obj.full_name}
+        session["show_password_modal"] = True
+        flash(f"{user_obj.full_name} için şifre gerekli.", "info")
+        return redirect(url_for("index"))
+
+    @app.post("/login/password")
+    def login_password():
+        pending = session.get("pending_login")
+        if not isinstance(pending, dict) or "id" not in pending:
+            flash("Lütfen önce kullanıcı seçin.", "warning")
+            return redirect(url_for("index"))
+
+        password = request.form.get("password", "")
+        user_obj = user_service.get_user(int(pending["id"]), base_path=str(BASE_PATH))
+        if user_obj is None or not user_obj.requires_password:
+            session.pop("pending_login", None)
+            session.pop("show_password_modal", None)
+            flash("Geçersiz giriş isteği.", "error")
+            return redirect(url_for("index"))
+
+        if user_service.authenticate_user(user_obj.id, password, base_path=str(BASE_PATH)):
+            set_session_user(user_obj)
+            session.pop("pending_login", None)
+            session.pop("show_password_modal", None)
+            flash(f"Hoş geldiniz {user_obj.full_name}!", "success")
+            return redirect(url_for("index"))
+
+        session["pending_login"] = {"id": user_obj.id, "full_name": user_obj.full_name}
+        session["show_password_modal"] = True
+        flash("Şifre hatalı. Lütfen tekrar deneyin.", "error")
+        return redirect(url_for("index"))
+
+    @app.get("/login/cancel")
+    def login_cancel():
+        session.pop("pending_login", None)
+        session.pop("show_password_modal", None)
+        flash("Giriş işlemi iptal edildi.", "info")
+        return redirect(url_for("index"))
 
     @app.route("/reports")
     def reports():
+        response = require_roles("admin", "atayan")
+        if response is not None:
+            return response
+
         selected_start = request.args.get("start_date", "").strip()
         selected_end = request.args.get("end_date", "").strip()
 
@@ -464,8 +601,24 @@ def register_routes(app: Flask) -> None:
             quick_filters=quick_filters,
         )
 
+    @app.route("/gorevlerim")
+    def my_tasks():
+        response = require_roles("calisan")
+        if response is not None:
+            return response
+
+        current = get_current_user()
+        assignments = form_service.list_forms_for_assignee(
+            current.get("id"), base_path=str(BASE_PATH)
+        )
+        return render_template("my_tasks.html", assignments=assignments)
+
     @app.post("/form/load")
     def load_form_redirect():
+        response = require_login()
+        if response is not None:
+            return response
+
         form_no = request.form.get("form_no_input", "").strip() or request.form.get("form_no_select", "").strip()
         if not form_no:
             flash("Form numarası seçin veya girin.", "warning")
@@ -473,6 +626,12 @@ def register_routes(app: Flask) -> None:
         form_data = ensure_form_data(form_no)
         if form_data is None:
             return redirect(url_for("index"))
+
+        current = get_current_user()
+        if current and current.get("role") == "calisan":
+            if form_data.get("assigned_to_user_id") != current.get("id"):
+                flash("Bu göreve erişiminiz yok.", "error")
+                return redirect(url_for("index"))
 
         status = form_service.determine_form_status(form_data)
         form_data["durum"] = status.code
@@ -489,8 +648,50 @@ def register_routes(app: Flask) -> None:
         store_form_in_session(form_no, form_data)
         return redirect(url_for("form_wizard", form_no=form_no, step=last_step))
 
+    @app.post("/form/<form_no>/assign")
+    def assign_form_route(form_no: str):
+        response = require_roles("admin", "atayan")
+        if response is not None:
+            return response
+
+        form_data = ensure_form_data(form_no)
+        if form_data is None:
+            flash(f"Form {form_no} bulunamadı.", "error")
+            return redirect(url_for("index"))
+
+        assigned_id_raw = request.form.get("assigned_user_id", "").strip()
+        assigned_id = int(assigned_id_raw) if assigned_id_raw.isdigit() else None
+        if assigned_id is None:
+            flash("Lütfen görevlendirmek için bir çalışan seçin.", "warning")
+            return redirect(url_for("form_wizard", form_no=form_no, step=4))
+
+        employee = user_service.get_user(assigned_id, base_path=str(BASE_PATH))
+        if employee is None or employee.role != "calisan":
+            flash("Seçilen kullanıcı geçersiz.", "error")
+            return redirect(url_for("form_wizard", form_no=form_no, step=4))
+
+        current = get_current_user()
+        assigned_timestamp = form_service.assign_form(
+            form_no,
+            assigned_to_user_id=employee.id,
+            assigned_by_user_id=current.get("id") if current else None,
+            base_path=str(BASE_PATH),
+        )
+
+        form_data["assigned_to_user_id"] = employee.id
+        form_data["assigned_by_user_id"] = current.get("id") if current else None
+        form_data["assigned_at"] = assigned_timestamp
+        store_form_in_session(form_no, form_data)
+
+        flash(f"Form {employee.full_name} kullanıcısına atandı.", "success")
+        return redirect(url_for("form_wizard", form_no=form_no, step=4))
+
     @app.route("/form/new")
     def new_form():
+        response = require_roles("admin", "atayan")
+        if response is not None:
+            return response
+
         try:
             form_no = form_service.get_next_form_no(base_path=str(BASE_PATH))
         except FormServiceError as exc:
@@ -508,16 +709,30 @@ def register_routes(app: Flask) -> None:
         form_data["gorev_ekleri"] = []
         form_data["harcama_bildirimleri"] = []
         form_data["last_step"] = 0
+        form_data["assigned_to_user_id"] = None
+        form_data["assigned_by_user_id"] = get_current_user()["id"] if get_current_user() else None
+        form_data["assigned_at"] = None
         store_form_in_session(form_no, form_data)
         flash(f"Yeni form oluşturuldu. Form No: {form_no}", "success")
         return redirect(url_for("form_wizard", form_no=form_no, step=0))
 
     @app.route("/form/<form_no>", methods=["GET", "POST"])
     def form_wizard(form_no: str):
+        response = require_login()
+        if response is not None:
+            return response
+
         step = clamp_step(request.values.get("step", 0))
         form_data = ensure_form_data(form_no)
         if form_data is None:
             flash(f"Form {form_no} yüklenemedi.", "error")
+            return redirect(url_for("index"))
+
+        current = get_current_user()
+        role = current.get("role") if current else None
+        is_employee = role == "calisan"
+        if is_employee and form_data.get("assigned_to_user_id") != current.get("id"):
+            flash("Bu göreve erişiminiz yok.", "error")
             return redirect(url_for("index"))
 
         if is_form_locked(form_no):
@@ -525,8 +740,13 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("form_summary", form_no=form_no))
 
         current_step = FORM_STEPS[step]
+        read_only_step = is_employee and current_step["id"] != "gorev_bilgileri"
 
         if request.method == "POST":
+            if read_only_step:
+                flash("Bu adımda değişiklik yapamazsınız.", "warning")
+                return redirect(url_for("form_wizard", form_no=form_no, step=step))
+
             action = request.form.get("action", "next")
             remove_target = ""
             remove_expense_index = ""
@@ -597,6 +817,9 @@ def register_routes(app: Flask) -> None:
             else:
                 target_step = min(total_steps - 1, step + 1)
 
+            if is_employee:
+                target_step = max(total_steps - 1, target_step)
+
             update_last_step(form_data, target_step)
             store_form_in_session(form_no, form_data)
 
@@ -620,6 +843,21 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("form_wizard", form_no=form_no, step=next_step))
 
         dynamic_data = get_dynamic_data()
+        assigned_user = None
+        assigned_by_user = None
+        if form_data.get("assigned_to_user_id"):
+            assigned_user = user_service.get_user(
+                int(form_data["assigned_to_user_id"]), base_path=str(BASE_PATH)
+            )
+        if form_data.get("assigned_by_user_id"):
+            assigned_by_user = user_service.get_user(
+                int(form_data["assigned_by_user_id"]), base_path=str(BASE_PATH)
+            )
+        available_employees = []
+        if has_role("admin", "atayan"):
+            available_employees = user_service.list_users_by_role(
+                "calisan", base_path=str(BASE_PATH)
+            )
         return render_template(
             current_step["template"],
             form_no=form_no,
@@ -629,13 +867,27 @@ def register_routes(app: Flask) -> None:
             taseron_options=dynamic_data["taseron_options"],
             hazirlayan_options=dynamic_data["hazirlayan_options"],
             arac_plaka_options=dynamic_data["arac_plaka_options"],
+            read_only_step=read_only_step,
+            is_employee=is_employee,
+            assigned_user=assigned_user,
+            assigned_by_user=assigned_by_user,
+            available_employees=available_employees,
         )
 
     @app.route("/form/<form_no>/summary", methods=["GET", "POST"])
     def form_summary(form_no: str):
+        response = require_login()
+        if response is not None:
+            return response
+
         form_data = ensure_form_data(form_no)
         if form_data is None:
             flash(f"Form {form_no} yüklenemedi.", "error")
+            return redirect(url_for("index"))
+
+        current = get_current_user()
+        if current and current.get("role") == "calisan" and form_data.get("assigned_to_user_id") != current.get("id"):
+            flash("Bu göreve erişiminiz yok.", "error")
             return redirect(url_for("index"))
 
         status = form_service.determine_form_status(form_data)
@@ -669,6 +921,17 @@ def register_routes(app: Flask) -> None:
             for field in status.missing_fields
         ]
 
+        assigned_user = None
+        assigned_by_user = None
+        if form_data.get("assigned_to_user_id"):
+            assigned_user = user_service.get_user(
+                int(form_data["assigned_to_user_id"]), base_path=str(BASE_PATH)
+            )
+        if form_data.get("assigned_by_user_id"):
+            assigned_by_user = user_service.get_user(
+                int(form_data["assigned_by_user_id"]), base_path=str(BASE_PATH)
+            )
+
         return render_template(
             "summary.html",
             form_no=form_no,
@@ -676,6 +939,8 @@ def register_routes(app: Flask) -> None:
             status=status,
             missing_fields=missing_fields,
             locked=locked,
+            assigned_user=assigned_user,
+            assigned_by_user=assigned_by_user,
         )
 
     @app.get("/form/<form_no>/attachments/<path:filename>")
@@ -715,21 +980,25 @@ def register_routes(app: Flask) -> None:
             download_name=original_name,
         )
 
-    @app.route("/admin", methods=["GET", "POST"])
+    @app.route("/admin")
     def admin_panel():
-        if not is_admin():
-            if request.method == "POST":
-                password = request.form.get("password", "")
-                if password == ADMIN_PASSWORD:
-                    session["is_admin"] = True
-                    flash("Admin paneline giriş yapıldı.", "success")
-                    return redirect(url_for("admin_panel"))
-                flash("Hatalı şifre.", "error")
-            return render_template("admin_login.html")
+        response = ensure_admin_access()
+        if response is not None:
+            return response
 
         dynamic_data = get_dynamic_data()
         form_defaults = get_form_defaults()
-        return render_template("admin.html", data=dynamic_data, form_defaults=form_defaults)
+        admin_users = user_service.list_users_by_role("admin", base_path=str(BASE_PATH))
+        assign_users = user_service.list_users_by_role("atayan", base_path=str(BASE_PATH))
+        employee_users = user_service.list_users_by_role("calisan", base_path=str(BASE_PATH))
+        return render_template(
+            "admin.html",
+            data=dynamic_data,
+            form_defaults=form_defaults,
+            admin_users=admin_users,
+            assign_users=assign_users,
+            employee_users=employee_users,
+        )
 
     @app.post("/admin/update")
     def admin_update():
@@ -753,6 +1022,57 @@ def register_routes(app: Flask) -> None:
             }
         )
         flash("Veri listeleri güncellendi.", "success")
+        return redirect(url_for("admin_panel"))
+
+    @app.post("/admin/users/<role>/create")
+    def admin_create_user(role: str):
+        response = ensure_admin_access()
+        if response is not None:
+            return response
+
+        normalized_role = (role or "").strip().lower()
+        if normalized_role not in {"admin", "atayan", "calisan"}:
+            flash("Geçersiz rol seçimi.", "error")
+            return redirect(url_for("admin_panel"))
+
+        full_name = request.form.get("full_name", "")
+        email = request.form.get("email")
+        phone = request.form.get("phone")
+        password = request.form.get("password")
+
+        try:
+            created = user_service.create_user(
+                full_name=full_name,
+                email=email,
+                phone=phone,
+                password=password,
+                role=normalized_role,
+                base_path=str(BASE_PATH),
+            )
+        except UserServiceError as exc:
+            flash(str(exc), "error")
+        else:
+            flash(f"{created.full_name} başarıyla eklendi.", "success")
+        return redirect(url_for("admin_panel"))
+
+    @app.post("/admin/users/<int:user_id>/delete")
+    def admin_delete_user(user_id: int):
+        response = ensure_admin_access()
+        if response is not None:
+            return response
+
+        current = get_current_user()
+        if current and current.get("id") == user_id:
+            flash("Kendi hesabınızı silemezsiniz.", "warning")
+            return redirect(url_for("admin_panel"))
+
+        user_obj = user_service.get_user(user_id, base_path=str(BASE_PATH))
+        if user_obj is None:
+            flash("Kullanıcı bulunamadı.", "error")
+            return redirect(url_for("admin_panel"))
+
+        user_service.delete_user(user_id, base_path=str(BASE_PATH))
+        flash(f"{user_obj.full_name} silindi.", "info")
         return redirect(url_for("admin_panel"))
 
     @app.post("/admin/upload")
@@ -786,11 +1106,15 @@ def register_routes(app: Flask) -> None:
         flash("Yeni JSON dosyası yüklendi.", "success")
         return redirect(url_for("admin_panel"))
 
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        flash("Çıkış yapıldı. Tekrar görüşmek üzere!", "info")
+        return redirect(url_for("index"))
+
     @app.get("/admin/logout")
     def admin_logout():
-        session.pop("is_admin", None)
-        flash("Admin oturumu kapatıldı.", "info")
-        return redirect(url_for("index"))
+        return redirect(url_for("logout"))
 
     @app.get("/form/<form_no>/export/excel")
     def export_form_excel(form_no: str):

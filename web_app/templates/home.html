@@ -2,14 +2,80 @@
 {% block title %}Ana Menü · Görev Formu Sistemi{% endblock %}
 
 {% block content %}
+<div class="modal-overlay {% if not current_user %}is-visible{% endif %}" id="welcome-modal" data-fixed="true">
+    <div class="modal">
+        <h2>Delta Proje - Hoş Geldiniz</h2>
+        <p>Lütfen kendinizi seçin:</p>
+        <form method="post" action="{{ url_for('login_select') }}" class="stacked">
+            <label for="user_id">Kullanıcı</label>
+            <select id="user_id" name="user_id" required>
+                <option value="">Kullanıcı seçin...</option>
+                {% for user in login_users %}
+                <option value="{{ user.id }}">{{ user.full_name }}{% if user.role != 'calisan' %} ({{ 'Admin' if user.role == 'admin' else 'Atayan' }}){% endif %}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="button primary">Devam Et</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay {% if show_password_modal and pending_login %}is-visible{% endif %}" id="password-modal" data-fixed="true">
+    <div class="modal">
+        <h2>Şifrenizi Girin</h2>
+        {% if pending_login %}
+        <p>{{ pending_login['full_name'] if pending_login['full_name'] else '' }} hesabına giriş yapıyorsunuz.</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('login_password') }}" class="stacked">
+            <label for="password">Şifre</label>
+            <input id="password" name="password" type="password" minlength="1" required>
+            <div class="modal-actions">
+                <button type="submit" class="button primary">Giriş Yap</button>
+                <a class="button secondary" href="{{ url_for('login_cancel') }}">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if current_user %}
 <div class="menu-grid">
+    {% if current_user.role in ['admin', 'atayan'] %}
     <div class="menu-card accent-blue">
         <h2>📝 Yeni Görev Oluştur</h2>
         <p>Yeni bir görev formu numarası alarak adım adım formu doldurun.</p>
         <a class="button primary" href="{{ url_for('new_form') }}">Yeni Form Başlat</a>
     </div>
+    {% endif %}
+
     <div class="menu-card accent-yellow">
         <h2>📂 Görev Formu Çağır</h2>
+        {% if current_user.role == 'calisan' %}
+        <p>Size atanan görev formlarını açın.</p>
+        {% if assigned_forms %}
+        <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline">
+            <label for="form_no_select">Form No</label>
+            <select id="form_no_select" name="form_no_select" required>
+                <option value="">Form seçin...</option>
+                {% for item in assigned_forms %}
+                <option value="{{ item.form_no }}">{{ item.form_no }} · {{ item.gorev_yeri or 'Görev Yeri Yok' }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="button secondary">Formu Aç</button>
+        </form>
+        <div class="assigned-list">
+            {% for item in assigned_forms %}
+            <div class="assigned-item">
+                <div>
+                    <strong>{{ item.form_no }}</strong>
+                    <span>{{ item.gorev_yeri or 'Görev Yeri Yok' }}</span>
+                </div>
+                <a class="button ghost" href="{{ url_for('form_summary', form_no=item.form_no) }}">Görüntüle</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p>Henüz size atanmış bir görev bulunmuyor.</p>
+        {% endif %}
+        {% else %}
         <p>Var olan bir form numarasını seçerek kaldığınız yerden devam edin.</p>
         <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline">
             <label for="form_no_select">Form No</label>
@@ -23,14 +89,25 @@
             <input type="text" name="form_no_input" placeholder="Form no girin">
             <button type="submit" class="button secondary">Formu Aç</button>
         </form>
+        {% endif %}
     </div>
+
+    {% if current_user.role == 'admin' %}
     <div class="menu-card accent-green">
         <h2>🛠️ Admin Paneli</h2>
-        <p>Açılır menülerdeki gerçek verileri görüntüleyin, düzenleyin veya yeni JSON dosyası yükleyin.</p>
+        <p>Kullanıcı yönetimi ve sistem ayarları için admin panelini açın.</p>
         <a class="button" href="{{ url_for('admin_panel') }}">Admin Panelini Aç</a>
     </div>
+    {% elif current_user.role == 'calisan' %}
+    <div class="menu-card accent-green">
+        <h2>🗂️ Görevlerim</h2>
+        <p>Tüm görevlerinizi tek ekranda listeleyin ve ilerlemenizi takip edin.</p>
+        <a class="button" href="{{ url_for('my_tasks') }}">Görevlerimi Gör</a>
+    </div>
+    {% endif %}
 </div>
 
+{% if current_user.role in ['admin', 'atayan'] %}
 <section class="search-section">
     <div class="search-header">
         <h2>🔍 Görev Sorgulama</h2>
@@ -97,4 +174,10 @@
         {% endif %}
     </div>
 </section>
+{% endif %}
+{% else %}
+<div class="login-placeholder">
+    <p>Devam etmek için lütfen açılan pencereden kullanıcı seçin.</p>
+</div>
+{% endif %}
 {% endblock %}
