@@ -51,7 +51,7 @@
         {% if current_user.role == 'calisan' %}
         <p>Size atanan görev formlarını açın.</p>
         {% if assigned_forms %}
-        <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline">
+        <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline assigned-quick-open">
             <label for="form_no_select">Form No</label>
             <select id="form_no_select" name="form_no_select" required>
                 <option value="">Form seçin...</option>
@@ -62,18 +62,24 @@
             </select>
             <button type="submit" class="button secondary">Formu Aç</button>
         </form>
-        <div class="assigned-list">
-            {% for item in assigned_forms %}
-            {% set display_location = item.gorev_il or item.gorev_firma or item.gorev_yeri or '-' %}
-            <div class="assigned-item">
-                <div class="assigned-item-details">
-                    <div class="detail"><span class="label">Form No</span><span class="value">{{ item.form_no }}</span></div>
-                    <div class="detail"><span class="label">Görev Tarihi</span><span class="value">{{ item.gorev_tarih or '-' }}</span></div>
-                    <div class="detail"><span class="label">İl/Firma</span><span class="value">{{ display_location }}</span></div>
-                </div>
-                <a class="button ghost" href="{{ url_for('form_summary', form_no=item.form_no) }}">Görüntüle</a>
+        <div class="assigned-wrapper">
+            <div class="assigned-header">
+                <span>Form No</span>
+                <span>Görev Tarihi</span>
+                <span>İl / Firma</span>
+                <span class="sr-only">İşlem</span>
             </div>
-            {% endfor %}
+            <div class="assigned-list">
+                {% for item in assigned_forms %}
+                {% set display_location = item.gorev_il or item.gorev_firma or item.gorev_yeri or '-' %}
+                <div class="assigned-item">
+                    <span class="assigned-cell" data-label="Form No">{{ item.form_no }}</span>
+                    <span class="assigned-cell" data-label="Görev Tarihi">{{ item.gorev_tarih or '-' }}</span>
+                    <span class="assigned-cell" data-label="İl / Firma">{{ display_location }}</span>
+                    <a class="button ghost" href="{{ url_for('form_summary', form_no=item.form_no) }}">Görüntüle</a>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% else %}
         <p>Henüz size atanmış bir görev bulunmuyor.</p>
