@@ -56,17 +56,20 @@
             <select id="form_no_select" name="form_no_select" required>
                 <option value="">Form seçin...</option>
                 {% for item in assigned_forms %}
-                <option value="{{ item.form_no }}">{{ item.form_no }} · {{ item.gorev_yeri or 'Görev Yeri Yok' }}</option>
+                {% set display_location = item.gorev_il or item.gorev_firma or item.gorev_yeri or 'Lokasyon belirtilmedi' %}
+                <option value="{{ item.form_no }}">{{ item.form_no }} · {{ item.gorev_tarih or '-' }} · {{ display_location }}</option>
                 {% endfor %}
             </select>
             <button type="submit" class="button secondary">Formu Aç</button>
         </form>
         <div class="assigned-list">
             {% for item in assigned_forms %}
+            {% set display_location = item.gorev_il or item.gorev_firma or item.gorev_yeri or '-' %}
             <div class="assigned-item">
-                <div>
-                    <strong>{{ item.form_no }}</strong>
-                    <span>{{ item.gorev_yeri or 'Görev Yeri Yok' }}</span>
+                <div class="assigned-item-details">
+                    <div class="detail"><span class="label">Form No</span><span class="value">{{ item.form_no }}</span></div>
+                    <div class="detail"><span class="label">Görev Tarihi</span><span class="value">{{ item.gorev_tarih or '-' }}</span></div>
+                    <div class="detail"><span class="label">İl/Firma</span><span class="value">{{ display_location }}</span></div>
                 </div>
                 <a class="button ghost" href="{{ url_for('form_summary', form_no=item.form_no) }}">Görüntüle</a>
             </div>

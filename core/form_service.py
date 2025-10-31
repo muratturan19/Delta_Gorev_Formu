@@ -683,21 +683,35 @@ def list_forms_for_assignee(
     assigned_user_id: int,
     *,
     base_path: str = ".",
+    personnel_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Belirli bir çalışana atanan formları döndür."""
 
-    query = (
-        "SELECT f.form_no, f.gorev_yeri, f.gorev_tanimi, f.durum, f.gorev_tarih, "
-        "f.yola_cikis_tarih, f.assigned_at, f.assigned_by_user_id, u.full_name AS assigned_by_name, "
-        "f.updated_at "
-        "FROM forms f "
-        "LEFT JOIN users u ON u.id = f.assigned_by_user_id "
-        "WHERE f.assigned_to_user_id = ? "
-        "ORDER BY f.updated_at DESC"
-    )
+    normalized_personnel = _normalize_for_search(personnel_name) if personnel_name else ""
+
+    base_query = [
+        "SELECT f.form_no, f.gorev_yeri, f.gorev_tanimi, f.durum, f.gorev_tarih,",
+        "f.yola_cikis_tarih, f.assigned_at, f.assigned_by_user_id,",
+        "u.full_name AS assigned_by_name, f.updated_at, f.assigned_to_user_id,",
+        "f.gorev_il, f.gorev_firma",
+        "FROM forms f",
+        "LEFT JOIN users u ON u.id = f.assigned_by_user_id",
+    ]
+
+    conditions = ["f.assigned_to_user_id = ?"]
+    params: List[Any] = [assigned_user_id]
+
+    if normalized_personnel:
+        conditions.append("f.personel_search LIKE ?")
+        params.append(f"%{normalized_personnel}%")
+
+    where_clause = " WHERE " + " OR ".join(conditions)
+    order_clause = " ORDER BY f.updated_at DESC"
+
+    query = " ".join(base_query) + where_clause + order_clause
 
     with _connect(base_path) as connection:
-        rows = connection.execute(query, (assigned_user_id,)).fetchall()
+        rows = connection.execute(query, tuple(params)).fetchall()
 
     assignments: List[Dict[str, Any]] = []
     for row in rows:
@@ -712,6 +726,9 @@ def list_forms_for_assignee(
                 "assigned_by_user_id": row["assigned_by_user_id"],
                 "assigned_by_name": row["assigned_by_name"] or "",
                 "updated_at": row["updated_at"],
+                "gorev_il": row["gorev_il"] or "",
+                "gorev_firma": row["gorev_firma"] or "",
+                "is_responsible": row["assigned_to_user_id"] == assigned_user_id,
             }
         )
 
