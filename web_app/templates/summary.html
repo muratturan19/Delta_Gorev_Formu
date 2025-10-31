@@ -49,14 +49,14 @@
                 <td colspan="2">{{ assigned_by_user.full_name if assigned_by_user else 'Belirlenmedi' }}</td>
             </tr>
             {% endif %}
+            <tr>
+                <th class="label">Görev Tarihi</th>
+                <td colspan="5">{{ form_data.get('gorev_tarih', '') or '-' }}</td>
+            </tr>
             <tr class="section">
                 <th colspan="2">GÖREVLİ PERSONEL</th>
                 <th colspan="2">AVANS TUTARI</th>
                 <th colspan="2">TAŞERON ŞİRKET</th>
-            </tr>
-            <tr>
-                <th class="label" colspan="2">Görev Tarihi</th>
-                <td colspan="4">{{ form_data.get('gorev_tarih', '') or '-' }}</td>
             </tr>
             {% for index in range(1, 6) %}
             <tr>
