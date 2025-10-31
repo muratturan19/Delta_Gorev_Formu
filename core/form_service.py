@@ -687,7 +687,8 @@ def list_forms_for_assignee(
 ) -> List[Dict[str, Any]]:
     """Belirli bir çalışana atanan formları döndür."""
 
-    normalized_personnel = _normalize_for_search(personnel_name) if personnel_name else ""
+    raw_personnel = (personnel_name or "").strip()
+    normalized_personnel = _normalize_for_search(raw_personnel) if raw_personnel else ""
 
     base_query = [
         "SELECT f.form_no, f.gorev_yeri, f.gorev_tanimi, f.durum, f.gorev_tarih,",
@@ -700,6 +701,12 @@ def list_forms_for_assignee(
 
     conditions = ["f.assigned_to_user_id = ?"]
     params: List[Any] = [assigned_user_id]
+
+    if raw_personnel:
+        field_conditions = [f"TRIM(f.{field}) = ?" for field in PERSONEL_FIELDS]
+        if field_conditions:
+            conditions.append("(" + " OR ".join(field_conditions) + ")")
+            params.extend([raw_personnel] * len(field_conditions))
 
     if normalized_personnel:
         conditions.append("f.personel_search LIKE ?")

@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import form_service
+from core import form_service, user_service
 
 
 @pytest.fixture
@@ -225,3 +225,44 @@ def test_get_reporting_summary(tmp_path, sample_form_data):
     assert summary["work_hours"]["total"] > 0
     assert len(summary["expense_chart"]["labels"]) == 2
     assert any("Ankara" in item["label"] for item in summary["locations"])
+
+
+def test_list_forms_for_assignee_includes_team_members(tmp_path, sample_form_data):
+    base_path = str(tmp_path)
+
+    responsible = user_service.create_user(
+        full_name="Ali Yılmaz", email=None, phone=None, password=None, role="calisan", base_path=base_path
+    )
+    teammate = user_service.create_user(
+        full_name="Ayşe Öztürk", email=None, phone=None, password=None, role="calisan", base_path=base_path
+    )
+
+    form_payload = dict(sample_form_data)
+    form_payload.update(
+        {
+            "personel_1": responsible.full_name,
+            "personel_2": teammate.full_name,
+            "assigned_to_user_id": responsible.id,
+            "assigned_by_user_id": None,
+            "assigned_at": "2024-05-01T10:00:00",
+        }
+    )
+    form_service.save_form("00099", form_payload, base_path=base_path)
+
+    # Eski verilerde personel_search sütunu boş olabilir; çalışan yine de görevi görmelidir.
+    with form_service.get_connection(base_path=base_path) as connection:
+        connection.execute(
+            "UPDATE forms SET personel_search = NULL WHERE form_no = ?",
+            ("00099",),
+        )
+        connection.commit()
+
+    assignments = form_service.list_forms_for_assignee(
+        teammate.id,
+        base_path=base_path,
+        personnel_name=teammate.full_name,
+    )
+
+    assert assignments, "Takım üyesi görevlendirildiği formu görmelidir."
+    assert assignments[0]["form_no"] == "00099"
+    assert not assignments[0]["is_responsible"]
