@@ -1551,9 +1551,26 @@ body {
     background: #fff;
 }
 
-.assigned-item strong {
-    display: block;
+.assigned-item-details {
+    display: grid;
+    gap: 4px;
+}
+
+.assigned-item-details .detail {
+    display: flex;
+    gap: 6px;
+    font-size: 0.95rem;
     color: #1f2937;
+}
+
+.assigned-item-details .detail .label {
+    font-weight: 600;
+    color: #475569;
+}
+
+.assigned-item-details .detail .value {
+    font-weight: 600;
+    color: #0f172a;
 }
 
 .button.ghost {
@@ -1891,6 +1908,21 @@ body {
 
 .status-chip.complete { background: #2e7d32; }
 .status-chip.partial { background: #f59e0b; }
+
+.role-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(13, 71, 161, 0.12);
+    color: #0d47a1;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
 
 .empty-state {
     padding: 24px;

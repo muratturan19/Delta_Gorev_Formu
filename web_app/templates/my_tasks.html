@@ -14,6 +14,7 @@
             <thead>
                 <tr>
                     <th>Form No</th>
+                    <th>Rol</th>
                     <th>Görev Yeri</th>
                     <th>Atayan</th>
                     <th>Durum</th>
@@ -25,6 +26,7 @@
                 {% for item in assignments %}
                 <tr>
                     <td data-label="Form No">{{ item.form_no }}</td>
+                    <td data-label="Rol">{{ 'Görev Sorumlusu' if item.is_responsible else 'Takım Üyesi' }}</td>
                     <td data-label="Görev Yeri">{{ item.gorev_yeri or '-' }}</td>
                     <td data-label="Atayan">{{ item.assigned_by_name or '—' }}</td>
                     <td data-label="Durum">

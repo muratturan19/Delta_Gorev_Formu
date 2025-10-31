@@ -505,6 +505,21 @@ def register_routes(app: Flask) -> None:
             locked.remove(form_no)
             set_locked_forms(sorted(locked))
 
+    def user_is_form_personnel(user: Dict[str, Any] | None, form_data: Dict[str, Any]) -> bool:
+        if not user or user.get("role") != "calisan":
+            return False
+
+        user_name = (user.get("full_name") or "").strip()
+        if not user_name:
+            return False
+
+        normalized_user = user_name.casefold()
+        for field in form_service.PERSONEL_FIELDS:
+            person_name = (form_data.get(field) or "").strip()
+            if person_name and person_name.casefold() == normalized_user:
+                return True
+        return False
+
     @app.route("/")
     def index():
         current = get_current_user()
@@ -527,7 +542,9 @@ def register_routes(app: Flask) -> None:
         if current and current.get("role") == "calisan":
             filters = {key: "" for key in filters}
             assigned_forms = form_service.list_forms_for_assignee(
-                current.get("id"), base_path=str(BASE_PATH)
+                current.get("id"),
+                base_path=str(BASE_PATH),
+                personnel_name=current.get("full_name"),
             )
             form_numbers = [item["form_no"] for item in assigned_forms]
         else:
@@ -860,7 +877,9 @@ def register_routes(app: Flask) -> None:
 
         current = get_current_user()
         assignments = form_service.list_forms_for_assignee(
-            current.get("id"), base_path=str(BASE_PATH)
+            current.get("id"),
+            base_path=str(BASE_PATH),
+            personnel_name=current.get("full_name"),
         )
         return render_template("my_tasks.html", assignments=assignments)
 
@@ -879,10 +898,15 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("index"))
 
         current = get_current_user()
-        if current and current.get("role") == "calisan":
-            if form_data.get("assigned_to_user_id") != current.get("id"):
-                flash("Bu göreve erişiminiz yok.", "error")
-                return redirect(url_for("index"))
+        is_employee = current and current.get("role") == "calisan"
+        is_responsible = bool(
+            is_employee and form_data.get("assigned_to_user_id") == current.get("id")
+        )
+        is_team_member = bool(is_employee and user_is_form_personnel(current, form_data))
+
+        if is_employee and not (is_responsible or is_team_member):
+            flash("Bu göreve erişiminiz yok.", "error")
+            return redirect(url_for("index"))
 
         status = form_service.determine_form_status(form_data)
         form_data["durum"] = status.code
@@ -891,6 +915,13 @@ def register_routes(app: Flask) -> None:
         if status.is_complete:
             lock_form(form_no)
             flash("Tamamlanmış form özet görünümünde açıldı.", "info")
+            return redirect(url_for("form_summary", form_no=form_no))
+
+        if is_employee and not is_responsible:
+            flash(
+                "Görev özetine yönlendirildiniz. Bu görevi yalnızca görev sorumlusu düzenleyebilir.",
+                "info",
+            )
             return redirect(url_for("form_summary", form_no=form_no))
 
         unlock_form(form_no)
@@ -1203,7 +1234,13 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("index"))
 
         current = get_current_user()
-        if current and current.get("role") == "calisan" and form_data.get("assigned_to_user_id") != current.get("id"):
+        is_employee = current and current.get("role") == "calisan"
+        is_responsible = bool(
+            is_employee and form_data.get("assigned_to_user_id") == current.get("id")
+        )
+        is_team_member = bool(is_employee and user_is_form_personnel(current, form_data))
+
+        if is_employee and not (is_responsible or is_team_member):
             flash("Bu göreve erişiminiz yok.", "error")
             return redirect(url_for("index"))
 
@@ -1212,6 +1249,7 @@ def register_routes(app: Flask) -> None:
         store_form_in_session(form_no, form_data)
 
         locked = is_form_locked(form_no)
+        can_edit = not locked and (not is_employee or is_responsible)
 
         if request.method == "POST":
             if locked:
@@ -1256,6 +1294,7 @@ def register_routes(app: Flask) -> None:
             status=status,
             missing_fields=missing_fields,
             locked=locked,
+            can_edit=can_edit,
             assigned_user=assigned_user,
             assigned_by_user=assigned_by_user,
         )
