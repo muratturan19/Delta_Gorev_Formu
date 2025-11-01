@@ -61,6 +61,7 @@ class TaskRequest:
     converted_form_no: Optional[str]
     created_at: str
     updated_at: str
+    converted_at: Optional[str]
     requested_by_name: Optional[str]
     assigned_to_name: Optional[str]
 
@@ -106,6 +107,7 @@ def _row_to_request(row) -> TaskRequest:
         converted_form_no=row["converted_form_no"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        converted_at=row["converted_at"],
         requested_by_name=row["requested_by_name"],
         assigned_to_name=row["assigned_to_name"],
     )
@@ -174,9 +176,10 @@ def create_task_request(
                 assigned_to_user_id,
                 converted_form_no,
                 created_at,
-                updated_at
+                updated_at,
+                converted_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 customer_name,
@@ -193,6 +196,7 @@ def create_task_request(
                 converted_form_no,
                 now,
                 now,
+                None,
             ),
         )
         request_id = cursor.lastrowid
@@ -252,6 +256,10 @@ def list_task_requests(*, status: Optional[str] = None, base_path: str = ".") ->
                 "assigned_to_user_id": request.assigned_to_user_id,
                 "assigned_to_name": request.assigned_to_name,
                 "converted_form_no": request.converted_form_no,
+                "converted_at": request.converted_at,
+                "converted_display": _format_datetime(request.converted_at)
+                if request.converted_at
+                else "",
                 "notes": request.notes or "",
                 "created_at": request.created_at,
                 "created_display": _format_datetime(request.created_at),
@@ -294,6 +302,10 @@ def get_task_request(request_id: int, *, base_path: str = ".") -> Optional[Dict[
         "assigned_to_user_id": request.assigned_to_user_id,
         "assigned_to_name": request.assigned_to_name,
         "converted_form_no": request.converted_form_no,
+        "converted_at": request.converted_at,
+        "converted_display": _format_datetime(request.converted_at)
+        if request.converted_at
+        else "",
         "notes": request.notes or "",
         "created_at": request.created_at,
         "created_display": _format_datetime(request.created_at),
@@ -367,10 +379,10 @@ def mark_converted(
         cursor = connection.execute(
             """
             UPDATE task_requests
-            SET status = 'converted', converted_form_no = ?, updated_at = ?
+            SET status = 'converted', converted_form_no = ?, updated_at = ?, converted_at = ?
             WHERE id = ?
             """,
-            (form_no, now, request_id),
+            (form_no, now, now, request_id),
         )
         if cursor.rowcount == 0:
             raise TaskRequestError("Talep bulunamadı.")

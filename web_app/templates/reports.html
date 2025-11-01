@@ -32,7 +32,18 @@
         <div class="report-card">
             <span class="report-card-label">Toplam Form</span>
             <strong class="report-card-value">{{ report.total_forms }}</strong>
-            <small>{{ report.filters.start_date or '-' }} → {{ report.filters.end_date or '-' }}</small>
+            <small>
+                {{ report.form_origins.direct }} doğrudan, {{ report.form_origins.converted }} talep dönüşümü<br>
+                {{ report.filters.start_date or '-' }} → {{ report.filters.end_date or '-' }}
+            </small>
+        </div>
+        <div class="report-card">
+            <span class="report-card-label">Görev Talepleri</span>
+            <strong class="report-card-value">{{ report.task_requests.total }}</strong>
+            <small>
+                {{ report.task_requests.converted }} görev formuna dönüştürüldü
+                ({{ "%.0f"|format(report.task_requests.conversion_rate) }}%)
+            </small>
         </div>
         <div class="report-card">
             <span class="report-card-label">Görevlendirilen Kişi Sayısı</span>
