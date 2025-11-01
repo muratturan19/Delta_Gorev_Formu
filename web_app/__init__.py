@@ -538,6 +538,8 @@ def register_routes(app: Flask) -> None:
         search_results: List[Dict[str, Any]] = []
         performed_search = False
         assigned_forms: List[Dict[str, Any]] = []
+        personnel_options: List[str] = []
+        location_options: List[str] = []
 
         if current and current.get("role") == "calisan":
             filters = {key: "" for key in filters}
@@ -549,6 +551,23 @@ def register_routes(app: Flask) -> None:
             form_numbers = [item["form_no"] for item in assigned_forms]
         else:
             form_numbers = form_service.list_form_numbers(base_path=str(BASE_PATH))
+            personnel_options = form_service.list_distinct_personnel(base_path=str(BASE_PATH))
+            location_options = form_service.list_distinct_locations(base_path=str(BASE_PATH))
+
+            current_person = filters["personel"]
+            if current_person and not any(
+                option.casefold() == current_person.casefold() for option in personnel_options
+            ):
+                personnel_options.append(current_person)
+                personnel_options.sort(key=lambda item: item.casefold())
+
+            current_location = filters["gorev_yeri"]
+            if current_location and not any(
+                option.casefold() == current_location.casefold() for option in location_options
+            ):
+                location_options.append(current_location)
+                location_options.sort(key=lambda item: item.casefold())
+
             performed_search = any(filters.values())
             if performed_search:
                 search_results = form_service.search_forms(
@@ -569,6 +588,8 @@ def register_routes(app: Flask) -> None:
             assigned_forms=assigned_forms,
             pending_login=pending_login,
             show_password_modal=show_password_modal,
+            personel_options=personnel_options,
+            location_options=location_options,
         )
 
     @app.post("/login/select")

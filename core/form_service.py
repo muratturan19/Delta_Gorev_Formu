@@ -679,6 +679,51 @@ def search_forms(
     return results
 
 
+def list_distinct_personnel(*, base_path: str = ".") -> List[str]:
+    """Form kayıtlarındaki benzersiz personel isimlerini döndür."""
+
+    with _connect(base_path) as connection:
+        rows = connection.execute(
+            "SELECT " + ", ".join(PERSONEL_FIELDS) + " FROM forms"
+        ).fetchall()
+
+    seen: Dict[str, str] = {}
+    for row in rows:
+        for field in PERSONEL_FIELDS:
+            value = (row[field] or "").strip()
+            if not value:
+                continue
+            normalized = value.casefold()
+            if normalized not in seen:
+                seen[normalized] = value
+
+    return sorted(seen.values(), key=lambda item: item.casefold())
+
+
+def list_distinct_locations(*, base_path: str = ".") -> List[str]:
+    """Form kayıtlarındaki benzersiz görev yerlerini döndür."""
+
+    with _connect(base_path) as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT gorev_yeri
+            FROM forms
+            WHERE gorev_yeri IS NOT NULL AND TRIM(gorev_yeri) != ''
+            """
+        ).fetchall()
+
+    seen: Dict[str, str] = {}
+    for row in rows:
+        value = (row["gorev_yeri"] or "").strip()
+        if not value:
+            continue
+        normalized = value.casefold()
+        if normalized not in seen:
+            seen[normalized] = value
+
+    return sorted(seen.values(), key=lambda item: item.casefold())
+
+
 def list_forms_for_assignee(
     assigned_user_id: int,
     *,
@@ -1250,6 +1295,8 @@ __all__ = [
     "generate_form_number",
     "get_next_form_no",
     "get_reporting_summary",
+    "list_distinct_locations",
+    "list_distinct_personnel",
     "list_form_numbers",
     "load_form_data",
     "save_form",

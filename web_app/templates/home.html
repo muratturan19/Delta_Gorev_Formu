@@ -122,14 +122,26 @@
         <h2>🔍 Görev Sorgulama</h2>
         <p>Belirli bir personel, şehir veya tarih aralığına göre geçmiş görevleri filtreleyin.</p>
     </div>
+    {% set selected_personel = search_filters.personel or '' %}
+    {% set selected_location = search_filters.gorev_yeri or '' %}
     <form method="get" action="{{ url_for('index') }}" class="search-form">
         <div class="form-group">
             <label for="personel">Personel</label>
-            <input type="text" id="personel" name="personel" placeholder="Örn. Ahmet" value="{{ search_filters.personel }}">
+            <select id="personel" name="personel">
+                <option value="">Tümü</option>
+                {% for option in personel_options %}
+                <option value="{{ option }}" {% if selected_personel and option|lower == selected_personel|lower %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label for="gorev_yeri">Görev Yeri</label>
-            <input type="text" id="gorev_yeri" name="gorev_yeri" placeholder="Örn. Ankara" value="{{ search_filters.gorev_yeri }}">
+            <select id="gorev_yeri" name="gorev_yeri">
+                <option value="">Tümü</option>
+                {% for option in location_options %}
+                <option value="{{ option }}" {% if selected_location and option|lower == selected_location|lower %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label for="start_date">Başlangıç Tarihi</label>
