@@ -533,6 +533,7 @@ def register_routes(app: Flask) -> None:
             "start_date": request.args.get("start_date", "").strip(),
             "end_date": request.args.get("end_date", "").strip(),
         }
+        search_triggered = request.args.get("performed_search", "").strip() == "1"
 
         form_numbers: List[str] = []
         search_results: List[Dict[str, Any]] = []
@@ -568,7 +569,7 @@ def register_routes(app: Flask) -> None:
                 location_options.append(current_location)
                 location_options.sort(key=lambda item: item.casefold())
 
-            performed_search = any(filters.values())
+            performed_search = search_triggered or any(filters.values())
             if performed_search:
                 search_results = form_service.search_forms(
                     person=filters["personel"],
