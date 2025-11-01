@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import form_service, user_service
+from core import form_service, task_request_service, user_service
 
 
 @pytest.fixture
@@ -225,6 +225,47 @@ def test_get_reporting_summary(tmp_path, sample_form_data):
     assert summary["work_hours"]["total"] > 0
     assert len(summary["expense_chart"]["labels"]) == 2
     assert any("Ankara" in item["label"] for item in summary["locations"])
+    assert summary["task_requests"]["total"] == 0
+    assert summary["task_requests"]["converted"] == 0
+    assert summary["form_origins"]["converted"] == 0
+    assert summary["form_origins"]["direct"] == summary["total_forms"]
+
+
+def test_reporting_summary_counts_task_requests(tmp_path, sample_form_data):
+    base_path = str(tmp_path)
+    form_service.save_form("00050", sample_form_data, base_path=base_path)
+
+    user_service.ensure_default_users(base_path=base_path)
+    admin_users = user_service.list_users_by_role("admin", base_path=base_path)
+    assert admin_users
+    requester = admin_users[0]
+
+    created_request = task_request_service.create_task_request(
+        customer_name="Test Firma",
+        customer_phone=None,
+        customer_email=None,
+        customer_address="Adres",
+        request_description="Deneme talebi",
+        requirements=None,
+        urgency="normal",
+        requested_by_user_id=requester.id,
+        base_path=base_path,
+    )
+
+    task_request_service.mark_converted(
+        created_request["id"], form_no="00050", base_path=base_path
+    )
+
+    summary = form_service.get_reporting_summary(
+        start_date="2000-01-01",
+        end_date="2100-12-31",
+        base_path=base_path,
+    )
+
+    assert summary["task_requests"]["total"] == 1
+    assert summary["task_requests"]["converted"] == 1
+    assert summary["form_origins"]["converted"] == 1
+    assert summary["form_origins"]["direct"] == summary["total_forms"] - 1
 
 
 def test_list_forms_for_assignee_includes_team_members(tmp_path, sample_form_data):

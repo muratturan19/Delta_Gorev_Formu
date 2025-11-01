@@ -173,11 +173,28 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             converted_form_no TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            converted_at TEXT,
             FOREIGN KEY(requested_by_user_id) REFERENCES users(id),
             FOREIGN KEY(assigned_to_user_id) REFERENCES users(id)
         )
         """
     )
+
+    task_request_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(task_requests)")
+    }
+    if "converted_at" not in task_request_columns:
+        connection.execute("ALTER TABLE task_requests ADD COLUMN converted_at TEXT")
+        connection.execute(
+            """
+            UPDATE task_requests
+            SET converted_at = updated_at
+            WHERE converted_at IS NULL
+              AND status = 'converted'
+              AND converted_form_no IS NOT NULL
+            """
+        )
+        connection.commit()
 
     existing_columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(forms)")
@@ -974,6 +991,59 @@ def get_reporting_summary(
         for key, count in sorted_locations
     ]
 
+    request_filters: List[str] = []
+    request_params: List[Any] = []
+    if start_iso:
+        request_filters.append("DATE(created_at) >= ?")
+        request_params.append(start_iso)
+    if end_iso:
+        request_filters.append("DATE(created_at) <= ?")
+        request_params.append(end_iso)
+    request_where = " WHERE " + " AND ".join(request_filters) if request_filters else ""
+
+    conversion_filters: List[str] = [
+        "status = 'converted'",
+        "converted_form_no IS NOT NULL",
+    ]
+    conversion_params: List[Any] = []
+    if start_iso:
+        conversion_filters.append("converted_at IS NOT NULL AND DATE(converted_at) >= ?")
+        conversion_params.append(start_iso)
+    if end_iso:
+        conversion_filters.append("converted_at IS NOT NULL AND DATE(converted_at) <= ?")
+        conversion_params.append(end_iso)
+    conversion_where = " WHERE " + " AND ".join(conversion_filters)
+
+    with _connect(base_path) as connection:
+        request_row = connection.execute(
+            f"SELECT COUNT(*) AS total FROM task_requests{request_where}",
+            tuple(request_params),
+        ).fetchone()
+        conversion_row = connection.execute(
+            f"SELECT COUNT(*) AS total FROM task_requests{conversion_where}",
+            tuple(conversion_params),
+        ).fetchone()
+        converted_form_rows = connection.execute(
+            "SELECT converted_form_no FROM task_requests WHERE converted_form_no IS NOT NULL"
+        ).fetchall()
+
+    total_requests = int(request_row["total"] or 0) if request_row else 0
+    converted_requests = int(conversion_row["total"] or 0) if conversion_row else 0
+    converted_form_nos = {
+        str(row["converted_form_no"]).strip()
+        for row in converted_form_rows
+        if row["converted_form_no"]
+    }
+    converted_forms_in_summary = sum(
+        1 for form in forms_summary if form["form_no"] in converted_form_nos
+    )
+    direct_forms = max(len(forms_summary) - converted_forms_in_summary, 0)
+    conversion_rate = (
+        round((converted_requests / total_requests) * 100, 2)
+        if total_requests
+        else 0.0
+    )
+
     return {
         "total_forms": len(forms_summary),
         "unique_person_count": len(unique_people),
@@ -994,6 +1064,15 @@ def get_reporting_summary(
             "values": expense_values,
         },
         "locations": location_breakdown,
+        "task_requests": {
+            "total": total_requests,
+            "converted": converted_requests,
+            "conversion_rate": conversion_rate,
+        },
+        "form_origins": {
+            "converted": converted_forms_in_summary,
+            "direct": direct_forms,
+        },
         "filters": {
             "start_date": start_iso or "",
             "end_date": end_iso or "",

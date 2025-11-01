@@ -35,6 +35,7 @@ def test_create_and_list_task_request(base_path, requester):
     )
 
     assert created["customer_name"] == "ABC Şirketi"
+    assert created["converted_at"] is None
     requests = task_request_service.list_task_requests(base_path=str(base_path))
     assert len(requests) == 1
     assert requests[0]["display_id"] == "#001"
@@ -83,3 +84,4 @@ def test_mark_converted_updates_status(base_path, requester):
     )
     assert converted["status"] == "converted"
     assert converted["converted_form_no"] == "00010"
+    assert converted["converted_at"]
