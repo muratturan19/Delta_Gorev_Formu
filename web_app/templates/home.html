@@ -125,6 +125,7 @@
     {% set selected_personel = search_filters.personel or '' %}
     {% set selected_location = search_filters.gorev_yeri or '' %}
     <form method="get" action="{{ url_for('index') }}" class="search-form">
+        <input type="hidden" name="performed_search" value="1">
         <div class="form-group">
             <label for="personel">Personel</label>
             <select id="personel" name="personel">
@@ -143,13 +144,13 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group">
-            <label for="start_date">Başlangıç Tarihi</label>
-            <input type="date" id="start_date" name="start_date" value="{{ search_filters.start_date }}">
-        </div>
-        <div class="form-group">
-            <label for="end_date">Bitiş Tarihi</label>
-            <input type="date" id="end_date" name="end_date" value="{{ search_filters.end_date }}">
+        <div class="form-group date-group">
+            <label for="start_date">Tarih Aralığı</label>
+            <div class="date-inputs">
+                <input type="date" id="start_date" name="start_date" value="{{ search_filters.start_date }}">
+                <span class="date-separator" aria-hidden="true">→</span>
+                <input type="date" id="end_date" name="end_date" value="{{ search_filters.end_date }}" aria-label="Bitiş Tarihi">
+            </div>
         </div>
         <div class="form-actions">
             <button type="submit" class="button primary">Sorgula</button>
