@@ -3,12 +3,12 @@
 
 {% block content %}
 <div class="modal-overlay {% if not current_user %}is-visible{% endif %}" id="welcome-modal" data-fixed="true">
-    <div class="modal">
-        <h2 class="home-hero-title">delta proje hidrolik</h2>
-        <p>Lütfen kendinizi seçin:</p>
-        <form method="post" action="{{ url_for('login_select') }}" class="stacked">
+    <div class="modal modal-welcome">
+        <h2 class="modal-welcome-title">delta proje hidrolik</h2>
+        <p class="modal-welcome-subtitle">Lütfen kendinizi seçin:</p>
+        <form method="post" action="{{ url_for('login_select') }}" class="stacked modal-welcome-form">
             <label for="user_id">Kullanıcı</label>
-            <select id="user_id" name="user_id" required>
+            <select id="user_id" name="user_id" class="modal-welcome-select" required>
                 <option value="">Kullanıcı seçin...</option>
                 {% for user in login_users %}
                 <option value="{{ user.id }}">{{ user.full_name }}{% if user.role != 'calisan' %} ({{ 'Admin' if user.role == 'admin' else 'Atayan' }}){% endif %}</option>
