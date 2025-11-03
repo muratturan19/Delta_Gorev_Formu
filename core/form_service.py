@@ -747,7 +747,7 @@ def list_forms_for_assignee(
     base_path: str = ".",
     personnel_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Belirli bir çalışana atanan formları döndür."""
+    """Belirli bir ekip üyesine atanan formları döndür."""
 
     raw_personnel = (personnel_name or "").strip()
     normalized_personnel = _normalize_for_search(raw_personnel) if raw_personnel else ""

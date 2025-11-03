@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Sequence, Set
+from typing import Any, Iterable, List, Optional, Sequence
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -89,7 +89,7 @@ def get_user(user_id: int, *, base_path: str = ".") -> Optional[User]:
 
 
 def get_user_by_name(full_name: str, *, base_path: str = ".") -> Optional[User]:
-    """Çalışan rolündeki kullanıcıyı tam ismine göre döndür."""
+    """Ekip üyesi rolündeki kullanıcıyı tam ismine göre döndür."""
 
     normalized = (full_name or "").strip()
     if not normalized:
@@ -227,23 +227,23 @@ def ensure_default_users(*, base_path: str = ".") -> None:
         {"full_name": "Mustafa Arslan", "email": None, "phone": None, "password": None, "role": "calisan"},
         {"full_name": "Emre Doğan", "email": None, "phone": None, "password": None, "role": "calisan"},
         {"full_name": "Burak Yıldız", "email": None, "phone": None, "password": None, "role": "calisan"},
-        # Önceki varsayılan çalışanlar
+        # Önceki varsayılan ekip üyeleri
         {
-            "full_name": "Mehmet Çalışan",
+            "full_name": "Mehmet Ekip",
             "email": "calisan1@deltaproje.com",
             "phone": "5551234567",
             "password": None,
             "role": "calisan",
         },
         {
-            "full_name": "Ayşe Çalışan",
+            "full_name": "Ayşe Ekip",
             "email": "calisan2@deltaproje.com",
             "phone": "5559876543",
             "password": None,
             "role": "calisan",
         },
         {
-            "full_name": "Ali Çalışan",
+            "full_name": "Ali Ekip",
             "email": "calisan3@deltaproje.com",
             "phone": "5555555555",
             "password": None,
@@ -252,19 +252,15 @@ def ensure_default_users(*, base_path: str = ".") -> None:
     ]
 
     with get_connection(base_path) as connection:
-        existing = connection.execute(
-            "SELECT full_name, COALESCE(email, '') as email, role FROM users"
-        ).fetchall()
-        existing_keys: Set[tuple[str, str, str]] = {
-            (row["full_name"], row["email"], row["role"]) for row in existing
-        }
+        row = connection.execute("SELECT COUNT(*) AS total FROM users").fetchone()
+        total_users = (row["total"] if row is not None else 0) or 0
+
+    if total_users > 0:
+        return
 
     for payload in defaults:
-        identifier = (payload["full_name"], payload["email"] or "", payload["role"])
-        if identifier in existing_keys:
-            continue
         try:
-            created = create_user(
+            create_user(
                 full_name=payload["full_name"],
                 email=payload["email"],
                 phone=payload["phone"],
@@ -274,8 +270,6 @@ def ensure_default_users(*, base_path: str = ".") -> None:
             )
         except UserServiceError:
             continue
-        else:
-            existing_keys.add((created.full_name, created.email or "", created.role))
 
 
 def update_user_password(user_id: int, password: str, *, base_path: str = ".") -> None:
