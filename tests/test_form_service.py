@@ -290,7 +290,7 @@ def test_list_forms_for_assignee_includes_team_members(tmp_path, sample_form_dat
     )
     form_service.save_form("00099", form_payload, base_path=base_path)
 
-    # Eski verilerde personel_search sütunu boş olabilir; çalışan yine de görevi görmelidir.
+    # Eski verilerde personel_search sütunu boş olabilir; ekip üyesi yine de görevi görmelidir.
     with form_service.get_connection(base_path=base_path) as connection:
         connection.execute(
             "UPDATE forms SET personel_search = NULL WHERE form_no = ?",

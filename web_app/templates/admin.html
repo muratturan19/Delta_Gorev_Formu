@@ -14,7 +14,7 @@
         <label for="default_rev_no">Varsayılan Revizyon</label>
         <input id="default_rev_no" name="default_rev_no" type="text" value="{{ form_defaults.rev_no }}" placeholder="00 / 06.05.24" required>
 
-        <p class="helper-text">Görev atama yetkilileri ve çalışan listeleri artık aşağıdaki tablolardan yönetilmektedir.</p>
+        <p class="helper-text">Görev atama yetkilileri ve ekip üyesi listeleri artık aşağıdaki tablolardan yönetilmektedir.</p>
 
         <label for="taseron_options">Taşeron Şirketler</label>
         <textarea id="taseron_options" name="taseron_options" rows="6">{{ data.taseron_options | join('\n') }}</textarea>
@@ -107,7 +107,7 @@
 </section>
 
 <section class="form-card">
-    <h3>👷 Çalışanlar</h3>
+    <h3>👥 Ekip Üyeleri</h3>
     <div class="user-management">
         <table class="user-table">
             <thead>
@@ -131,26 +131,26 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="4" class="empty">Kayıtlı çalışan bulunmuyor.</td></tr>
+                <tr><td colspan="4" class="empty">Kayıtlı ekip üyesi bulunmuyor.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         <form method="post" action="{{ url_for('admin_create_user', role='calisan') }}" class="stacked user-create">
-            <h4>Yeni Çalışan Ekle</h4>
+            <h4>Yeni Ekip Üyesi Ekle</h4>
             <label for="employee_full_name">Ad Soyad</label>
             <input id="employee_full_name" name="full_name" type="text" required>
             <label for="employee_email">E-posta (opsiyonel)</label>
             <input id="employee_email" name="email" type="email">
             <label for="employee_phone">Telefon (opsiyonel)</label>
             <input id="employee_phone" name="phone" type="text">
-            <button type="submit" class="button save">Çalışan Ekle</button>
+            <button type="submit" class="button save">Ekip Üyesi Ekle</button>
         </form>
     </div>
 </section>
 
 <section class="form-card">
     <h3>JSON Dosyası Yükle</h3>
-    <p>"taseron_options" ve "arac_plaka_options" anahtarlarını içeren bir JSON dosyası yükleyerek bu listeleri toplu olarak güncelleyebilirsiniz. Çalışan ve görev atama yetkilisi listeleri kullanıcı tablolarından yönetilir.</p>
+    <p>"taseron_options" ve "arac_plaka_options" anahtarlarını içeren bir JSON dosyası yükleyerek bu listeleri toplu olarak güncelleyebilirsiniz. Ekip üyesi ve görev atama yetkilisi listeleri kullanıcı tablolarından yönetilir.</p>
     <form method="post" action="{{ url_for('admin_upload') }}" enctype="multipart/form-data" class="stacked">
         <input type="file" name="data_file" accept="application/json" required>
         <button type="submit" class="button secondary">📁 Dosyayı Yükle</button>

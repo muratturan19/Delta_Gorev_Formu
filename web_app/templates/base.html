@@ -13,7 +13,7 @@
             <div class="app-brand">
                 <img src="{{ url_for('static', filename='images/dp_seffaf.PNG') }}" alt="Delta Proje logosu" class="app-logo">
                 <div class="brand-text">
-                    <span class="brand-title">Delta Proje</span>
+                    <span class="brand-title">delta proje hidrolik</span>
                     <span class="brand-subtitle">Görev Formu Sistemi</span>
                 </div>
             </div>
@@ -21,7 +21,7 @@
             <div class="user-session">
                 <span class="user-greeting">Merhaba, <strong>{{ current_user.full_name }}</strong></span>
                 <span class="role-badge role-{{ current_user.role }}">
-                    {% if current_user.role == 'admin' %}Admin{% elif current_user.role == 'atayan' %}Atayan{% else %}Çalışan{% endif %}
+                    {% if current_user.role == 'admin' %}Admin{% elif current_user.role == 'atayan' %}Atayan{% else %}Ekip Üyesi{% endif %}
                 </span>
                 <a class="button logout" href="{{ url_for('logout') }}">Çıkış Yap</a>
             </div>

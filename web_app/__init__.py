@@ -966,7 +966,7 @@ def register_routes(app: Flask) -> None:
         assigned_id_raw = request.form.get("assigned_user_id", "").strip()
         assigned_id = int(assigned_id_raw) if assigned_id_raw.isdigit() else None
         if assigned_id is None:
-            flash("Lütfen görevlendirmek için bir çalışan seçin.", "warning")
+            flash("Lütfen görevlendirmek için bir ekip üyesi seçin.", "warning")
             return redirect(url_for("form_wizard", form_no=form_no, step=4))
 
         employee = user_service.get_user(assigned_id, base_path=str(BASE_PATH))

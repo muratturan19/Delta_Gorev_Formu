@@ -4,7 +4,7 @@
 {% block content %}
 <div class="modal-overlay {% if not current_user %}is-visible{% endif %}" id="welcome-modal" data-fixed="true">
     <div class="modal">
-        <h2>Delta Proje - Hoş Geldiniz</h2>
+        <h2 class="home-hero-title">delta proje hidrolik</h2>
         <p>Lütfen kendinizi seçin:</p>
         <form method="post" action="{{ url_for('login_select') }}" class="stacked">
             <label for="user_id">Kullanıcı</label>
@@ -37,6 +37,11 @@
 </div>
 
 {% if current_user %}
+<div class="home-hero">
+    <h1 class="home-hero-title">delta proje hidrolik</h1>
+    <p class="home-hero-subtitle">Görevlerinizi tek merkezden yönetin.</p>
+</div>
+
 <div class="menu-grid">
     {% if current_user.role in ['admin', 'atayan'] %}
     <div class="menu-card accent-blue">
@@ -49,7 +54,7 @@
     <div class="menu-card accent-yellow">
         <h2>📂 Görev Formu Çağır</h2>
         {% if current_user.role == 'calisan' %}
-        <p>Size atanan görev formlarını açın.</p>
+        <p>Ekip üyesi olarak size atanan görev formlarını açın.</p>
         {% if assigned_forms %}
         <form method="post" action="{{ url_for('load_form_redirect') }}" class="form-inline assigned-quick-open">
             <label for="form_no_select">Form No</label>

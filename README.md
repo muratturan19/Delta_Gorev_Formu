@@ -50,11 +50,11 @@ tests/               # Pytest senaryoları
 - Uygulama açıldığında kullanıcı seçimi için bir karşılama penceresi görünür. Tüm kullanıcılar
   açılır listeden kendisini seçer; admin ve görev atama yetkilileri için ek olarak şifre girişi
   istenir.
-- Roller: `admin`, `atayan` (görev atama yetkilisi) ve `calisan`. Admin ve atayan hesaplarının
-  şifreleri zorunludur; çalışan hesapları şifresizdir ve yalnızca kendilerine atanan görevlerin
+- Roller: `admin`, `atayan` (görev atama yetkilisi) ve `calisan` (ekip üyesi). Admin ve atayan hesaplarının
+  şifreleri zorunludur; ekip üyesi hesapları şifresizdir ve yalnızca kendilerine atanan görevlerin
   6. adımını (görev raporu ve harcamalar) düzenleyebilir.
 - Yan menü ve ana sayfa kartları rol bazlı olarak şekillenir. Örneğin adminler admin paneli ve
-  raporlama bölümlerine erişirken, çalışanlar "Görevlerim" listesine yönlendirilir.
+  raporlama bölümlerine erişirken, ekip üyeleri "Görevlerim" listesine yönlendirilir.
 - Çıkış işlemi üst menüdeki "Çıkış Yap" bağlantısıyla yapılır; işlem tamamlandığında karşılama
   penceresi yeniden açılır.
 
