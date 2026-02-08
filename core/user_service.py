@@ -8,7 +8,7 @@ from typing import Any, Iterable, List, Optional, Sequence
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .form_service import get_connection
+from .db import get_connection
 
 DEFAULT_ASSIGNER_PASSWORD = os.environ.get("DEFAULT_ASSIGNER_PASSWORD", "Gorev123!")
 
@@ -25,6 +25,7 @@ class User:
     phone: Optional[str]
     role: str
     is_active: bool
+    portal_user_id: Optional[int] = None
 
     @property
     def requires_password(self) -> bool:
@@ -39,6 +40,7 @@ def _row_to_user(row) -> User:
         phone=row["phone"],
         role=row["role"],
         is_active=bool(row["is_active"]),
+        portal_user_id=row.get("portal_user_id") if hasattr(row, "get") else (row["portal_user_id"] if "portal_user_id" in row.keys() else None),
     )
 
 
@@ -48,7 +50,7 @@ def list_users(*, base_path: str = ".", include_inactive: bool = False) -> List[
     if not include_inactive:
         query += " WHERE is_active = 1"
 
-    query += " ORDER BY full_name COLLATE NOCASE"
+    query += " ORDER BY LOWER(full_name)"
 
     with get_connection(base_path) as connection:
         rows = connection.execute(query, tuple(params)).fetchall()
@@ -73,7 +75,7 @@ def list_users_by_roles(roles: Sequence[str], *, base_path: str = ".") -> List[U
     query = (
         "SELECT * FROM users WHERE role IN ("
         + placeholders
-        + ") AND is_active = 1 ORDER BY full_name COLLATE NOCASE"
+        + ") AND is_active = 1 ORDER BY LOWER(full_name)"
     )
     with get_connection(base_path) as connection:
         rows = connection.execute(query, tuple(normalized_list)).fetchall()
@@ -111,6 +113,23 @@ def get_user_by_name(full_name: str, *, base_path: str = ".") -> Optional[User]:
     return _row_to_user(row)
 
 
+def get_user_by_portal_id(portal_user_id: int, *, base_path: str = ".") -> Optional[User]:
+    """Portal kullanıcı ID'sine göre yerel kullanıcıyı döndür."""
+
+    if portal_user_id is None:
+        return None
+
+    with get_connection(base_path) as connection:
+        row = connection.execute(
+            "SELECT * FROM users WHERE portal_user_id = ? AND is_active = 1 LIMIT 1",
+            (portal_user_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+    return _row_to_user(row)
+
+
 def authenticate_user(user_id: int, password: str, *, base_path: str = ".") -> bool:
     with get_connection(base_path) as connection:
         row = connection.execute(
@@ -136,6 +155,7 @@ def create_user(
     phone: Optional[str],
     password: Optional[str],
     role: str,
+    portal_user_id: Optional[int] = None,
     base_path: str = ".",
 ) -> User:
     full_name = (full_name or "").strip()
@@ -151,19 +171,17 @@ def create_user(
 
     password_hash = None
     if role in {"admin", "atayan"}:
-        if not password or len(password) < 8:
-            raise UserServiceError("Şifre en az 8 karakter olmalıdır.")
-        password_hash = generate_password_hash(password)
+        if password and len(password) >= 8:
+            password_hash = generate_password_hash(password)
 
     with get_connection(base_path) as connection:
-        cursor = connection.execute(
+        user_id = connection.execute_returning_id(
             """
-            INSERT INTO users (full_name, email, phone, password_hash, role, is_active)
-            VALUES (?, ?, ?, ?, ?, 1)
+            INSERT INTO users (full_name, email, phone, password_hash, role, is_active, portal_user_id)
+            VALUES (?, ?, ?, ?, ?, 1, ?)
             """,
-            (full_name, email, phone, password_hash, role),
+            (full_name, email, phone, password_hash, role, portal_user_id),
         )
-        user_id = cursor.lastrowid
         connection.commit()
 
     created = get_user(user_id, base_path=base_path)
@@ -175,6 +193,20 @@ def create_user(
 def delete_user(user_id: int, *, base_path: str = ".") -> None:
     with get_connection(base_path) as connection:
         connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        connection.commit()
+
+
+def update_user_role(user_id: int, role: str, *, base_path: str = ".") -> None:
+    """Kullanıcının rolünü güncelle."""
+    role = (role or "").strip().lower()
+    if role not in {"admin", "atayan", "calisan"}:
+        raise UserServiceError("Geçersiz rol seçimi.")
+
+    with get_connection(base_path) as connection:
+        connection.execute(
+            "UPDATE users SET role = ? WHERE id = ?",
+            (role, user_id),
+        )
         connection.commit()
 
 

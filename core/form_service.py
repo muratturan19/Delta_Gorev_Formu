@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import json
 import os
-import sqlite3
 import unicodedata
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -19,6 +18,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 
+from .db import get_connection, is_postgres
 
 DB_FILENAME = "forms.db"
 
@@ -42,185 +42,16 @@ class FormStatus:
 
 
 def get_db_path(base_path: str = ".") -> str:
-    """Veritabanı dosya yolunu döndür."""
-
+    """Veritabanı dosya yolunu döndür (geriye dönük uyumluluk)."""
+    data_folder = os.environ.get("DATA_FOLDER", "").strip()
+    if data_folder:
+        return os.path.join(data_folder, DB_FILENAME)
     return os.path.join(base_path, DB_FILENAME)
 
 
-def get_connection(base_path: str = ".") -> sqlite3.Connection:
-    """Uygulama genelinde kullanılan veritabanı bağlantısını döndür."""
-
-    return _connect(base_path)
-
-
-def _connect(base_path: str = ".") -> sqlite3.Connection:
-    db_path = get_db_path(base_path)
-    directory = os.path.dirname(db_path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
-
-    connection = sqlite3.connect(db_path)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    _ensure_schema(connection)
-    return connection
-
-
-def _ensure_schema(connection: sqlite3.Connection) -> None:
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            email TEXT,
-            phone TEXT,
-            password_hash TEXT,
-            role TEXT NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS forms (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            form_no TEXT NOT NULL UNIQUE,
-            tarih TEXT,
-            tarih_iso TEXT,
-            dok_no TEXT,
-            rev_no TEXT,
-            avans TEXT,
-            taseron TEXT,
-            gorev_tanimi TEXT,
-            gorev_yeri TEXT,
-            gorev_yeri_lower TEXT,
-            gorev_il TEXT,
-            gorev_ilce TEXT,
-            gorev_firma TEXT,
-            gorev_tarih TEXT,
-            gorev_tarih_iso TEXT,
-            yapilan_isler TEXT,
-            gorev_ekleri TEXT,
-            harcama_bildirimleri TEXT,
-            yola_cikis_tarih TEXT,
-            yola_cikis_tarih_iso TEXT,
-            yola_cikis_saat TEXT,
-            donus_tarih TEXT,
-            donus_tarih_iso TEXT,
-            donus_saat TEXT,
-            calisma_baslangic_tarih TEXT,
-            calisma_baslangic_tarih_iso TEXT,
-            calisma_baslangic_saat TEXT,
-            calisma_bitis_tarih TEXT,
-            calisma_bitis_tarih_iso TEXT,
-            calisma_bitis_saat TEXT,
-            mola_suresi TEXT,
-            arac_plaka TEXT,
-            hazirlayan TEXT,
-            durum TEXT,
-            personel_1 TEXT,
-            personel_2 TEXT,
-            personel_3 TEXT,
-            personel_4 TEXT,
-            personel_5 TEXT,
-            personel_search TEXT,
-            last_step INTEGER DEFAULT 0,
-            assigned_to_user_id INTEGER,
-            assigned_by_user_id INTEGER,
-            assigned_at TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
-            FOREIGN KEY(assigned_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-        )
-        """
-    )
-    connection.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_forms_form_no
-            ON forms (form_no)
-        """
-    )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS form_sequence (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            last_no INTEGER NOT NULL DEFAULT 0
-        )
-        """
-    )
-    connection.execute(
-        "INSERT OR IGNORE INTO form_sequence (id, last_no) VALUES (1, 0)"
-    )
-
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS task_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_name TEXT NOT NULL,
-            customer_phone TEXT,
-            customer_email TEXT,
-            customer_address TEXT,
-            request_description TEXT NOT NULL,
-            requirements TEXT,
-            urgency TEXT DEFAULT 'normal',
-            requested_by_user_id INTEGER NOT NULL,
-            status TEXT DEFAULT 'pending',
-            notes TEXT,
-            assigned_to_user_id INTEGER,
-            converted_form_no TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            converted_at TEXT,
-            FOREIGN KEY(requested_by_user_id) REFERENCES users(id),
-            FOREIGN KEY(assigned_to_user_id) REFERENCES users(id)
-        )
-        """
-    )
-
-    task_request_columns = {
-        row["name"] for row in connection.execute("PRAGMA table_info(task_requests)")
-    }
-    if "converted_at" not in task_request_columns:
-        connection.execute("ALTER TABLE task_requests ADD COLUMN converted_at TEXT")
-        connection.execute(
-            """
-            UPDATE task_requests
-            SET converted_at = updated_at
-            WHERE converted_at IS NULL
-              AND status = 'converted'
-              AND converted_form_no IS NOT NULL
-            """
-        )
-        connection.commit()
-
-    existing_columns = {
-        row["name"] for row in connection.execute("PRAGMA table_info(forms)")
-    }
-    for column, definition in (
-        ("yapilan_isler", "TEXT"),
-        ("gorev_ekleri", "TEXT"),
-        ("harcama_bildirimleri", "TEXT"),
-        ("gorev_tarih", "TEXT"),
-        ("gorev_tarih_iso", "TEXT"),
-        ("last_step", "INTEGER DEFAULT 0"),
-        ("gorev_il", "TEXT"),
-        ("gorev_ilce", "TEXT"),
-        ("gorev_firma", "TEXT"),
-        ("assigned_to_user_id", "INTEGER"),
-        ("assigned_by_user_id", "INTEGER"),
-        ("assigned_at", "TEXT"),
-    ):
-        if column not in existing_columns:
-            connection.execute(f"ALTER TABLE forms ADD COLUMN {column} {definition}")
-
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_forms_assigned_to ON forms(assigned_to_user_id)"
-    )
-
-
+# ------------------------------------------------------------------
+# Pure helpers (no DB)
+# ------------------------------------------------------------------
 
 def determine_form_status(form_data: Dict[str, Any]) -> FormStatus:
     """Formun tamamlanma durumunu belirle."""
@@ -266,6 +97,27 @@ def _normalize_for_search(value: str | None) -> str:
     normalized = unicodedata.normalize("NFKD", folded)
     return "".join(char for char in normalized if not unicodedata.combining(char))
 
+
+def _normalize_last_step(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, numeric)
+
+
+def _normalize_optional_int(value: Any) -> Optional[int]:
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+# ------------------------------------------------------------------
+# Payload preparation
+# ------------------------------------------------------------------
 
 def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus) -> OrderedDict[str, Any]:
     payload: "OrderedDict[str, Any]" = OrderedDict()
@@ -379,22 +231,9 @@ def _prepare_payload(form_no: str, form_data: Dict[str, Any], status: FormStatus
     return payload
 
 
-def _normalize_last_step(value: Any) -> int:
-    try:
-        numeric = int(value)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, numeric)
-
-
-def _normalize_optional_int(value: Any) -> Optional[int]:
-    try:
-        if value is None or value == "":
-            return None
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
+# ------------------------------------------------------------------
+# Persistence
+# ------------------------------------------------------------------
 
 def _persist_form(
     form_no: str,
@@ -404,31 +243,60 @@ def _persist_form(
 ) -> str:
     payload = _prepare_payload(form_no, form_data, status)
 
-    placeholders = ", ".join(["?"] * len(payload))
-    columns = ", ".join(payload.keys())
-    updates = ", ".join(f"{column}=excluded.{column}" for column in payload.keys() if column != "form_no")
-
-    with _connect(base_path) as connection:
-        connection.execute(
-            f"""
-            INSERT INTO forms ({columns}, created_at, updated_at)
-            VALUES ({placeholders}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT(form_no) DO UPDATE SET
-                {updates},
-                updated_at=CURRENT_TIMESTAMP
-            """,
-            tuple(payload.values()),
+    if is_postgres():
+        columns = ", ".join(payload.keys())
+        placeholders = ", ".join(["?"] * len(payload))
+        updates = ", ".join(
+            f"{col}=EXCLUDED.{col}" for col in payload.keys() if col != "form_no"
         )
-        try:
-            numeric_form_no = int(form_no)
-        except ValueError:
-            numeric_form_no = None
-        if numeric_form_no is not None:
+        with get_connection(base_path) as connection:
             connection.execute(
-                "UPDATE form_sequence SET last_no = MAX(last_no, ?) WHERE id = 1",
-                (numeric_form_no,),
+                f"""
+                INSERT INTO forms ({columns}, created_at, updated_at)
+                VALUES ({placeholders}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(form_no) DO UPDATE SET
+                    {updates},
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                tuple(payload.values()),
             )
-        connection.commit()
+            try:
+                numeric_form_no = int(form_no)
+            except ValueError:
+                numeric_form_no = None
+            if numeric_form_no is not None:
+                connection.execute(
+                    "UPDATE form_sequence SET last_no = GREATEST(last_no, ?) WHERE id = 1",
+                    (numeric_form_no,),
+                )
+            connection.commit()
+    else:
+        columns = ", ".join(payload.keys())
+        placeholders = ", ".join(["?"] * len(payload))
+        updates = ", ".join(
+            f"{col}=excluded.{col}" for col in payload.keys() if col != "form_no"
+        )
+        with get_connection(base_path) as connection:
+            connection.execute(
+                f"""
+                INSERT INTO forms ({columns}, created_at, updated_at)
+                VALUES ({placeholders}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(form_no) DO UPDATE SET
+                    {updates},
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                tuple(payload.values()),
+            )
+            try:
+                numeric_form_no = int(form_no)
+            except ValueError:
+                numeric_form_no = None
+            if numeric_form_no is not None:
+                connection.execute(
+                    "UPDATE form_sequence SET last_no = MAX(last_no, ?) WHERE id = 1",
+                    (numeric_form_no,),
+                )
+            connection.commit()
 
     return get_db_path(base_path)
 
@@ -436,7 +304,7 @@ def _persist_form(
 def get_next_form_no(base_path: str = ".") -> str:
     """Veritabanındaki en yüksek form numarasını baz alarak bir sonrakini döndür."""
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         row = connection.execute(
             "SELECT last_no FROM form_sequence WHERE id = 1"
         ).fetchone()
@@ -460,7 +328,7 @@ def generate_form_number(base_path: str = ".") -> str:
 def load_form_data(form_no: str, base_path: str = ".") -> Dict[str, Any]:
     """Veritabanından form verisini iç sözlük olarak döndür."""
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         row = connection.execute(
             "SELECT * FROM forms WHERE form_no = ?", (form_no,)
         ).fetchone()
@@ -581,7 +449,7 @@ def assign_form(
     assigned_by = _normalize_optional_int(assigned_by_user_id)
     assigned_at = datetime.utcnow().isoformat(timespec="seconds") if assigned_to else None
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         result = connection.execute(
             "UPDATE forms SET assigned_to_user_id = ?, assigned_by_user_id = ?, assigned_at = ?, updated_at = CURRENT_TIMESTAMP WHERE form_no = ?",
             (assigned_to, assigned_by, assigned_at, form_no),
@@ -608,14 +476,14 @@ def save_form(
 def list_form_numbers(base_path: str = ".") -> List[str]:
     """Veritabanındaki form numaralarını son oluşturulandan başlayarak döndür."""
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(
             """
             SELECT form_no
             FROM forms
             ORDER BY CAST(
                 CASE
-                    WHEN form_no LIKE 'F-%' THEN SUBSTR(form_no, 3)
+                    WHEN form_no LIKE 'F-%%' THEN SUBSTR(form_no, 3)
                     ELSE form_no
                 END AS INTEGER
             ) DESC
@@ -671,7 +539,7 @@ def search_forms(
         + " ORDER BY COALESCE(yola_cikis_tarih_iso, '') DESC, CAST(form_no AS INTEGER) DESC"
     )
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(query, tuple(params)).fetchall()
 
     results: List[Dict[str, Any]] = []
@@ -699,7 +567,7 @@ def search_forms(
 def list_distinct_personnel(*, base_path: str = ".") -> List[str]:
     """Form kayıtlarındaki benzersiz personel isimlerini döndür."""
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(
             "SELECT " + ", ".join(PERSONEL_FIELDS) + " FROM forms"
         ).fetchall()
@@ -720,7 +588,7 @@ def list_distinct_personnel(*, base_path: str = ".") -> List[str]:
 def list_distinct_locations(*, base_path: str = ".") -> List[str]:
     """Form kayıtlarındaki benzersiz görev yerlerini döndür."""
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(
             """
             SELECT DISTINCT gorev_yeri
@@ -779,7 +647,7 @@ def list_forms_for_assignee(
 
     query = " ".join(base_query) + where_clause + order_clause
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(query, tuple(params)).fetchall()
 
     assignments: List[Dict[str, Any]] = []
@@ -870,10 +738,10 @@ def get_reporting_summary(
         + " ORDER BY COALESCE(yola_cikis_tarih_iso, gorev_tarih_iso, '') DESC, CAST(form_no AS INTEGER) DESC"
     )
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         rows = connection.execute(query, tuple(params)).fetchall()
 
-    def _combine_datetime(row: sqlite3.Row, date_key: str, iso_key: str, time_key: str) -> datetime | None:
+    def _combine_datetime(row, date_key: str, iso_key: str, time_key: str) -> datetime | None:
         date_iso = row[iso_key] or None
         if not date_iso:
             date_iso = _to_iso_date(row[date_key])
@@ -1014,7 +882,7 @@ def get_reporting_summary(
         conversion_params.append(end_iso)
     conversion_where = " WHERE " + " AND ".join(conversion_filters)
 
-    with _connect(base_path) as connection:
+    with get_connection(base_path) as connection:
         request_row = connection.execute(
             f"SELECT COUNT(*) AS total FROM task_requests{request_where}",
             tuple(request_params),
@@ -1079,6 +947,10 @@ def get_reporting_summary(
         },
     }
 
+
+# ------------------------------------------------------------------
+# Excel / PDF export (unchanged)
+# ------------------------------------------------------------------
 
 def _build_excel_workbook(form_no: str, form_data: Dict[str, Any], status: FormStatus) -> Workbook:
     workbook = Workbook()

@@ -8,16 +8,25 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
 
-from flask import (Flask, flash, redirect, render_template, request, send_file,
-                   send_from_directory, session, url_for)
+import jwt as pyjwt
+from flask import (Flask, flash, g, redirect, render_template, request,
+                   send_file, send_from_directory, session, url_for)
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from core import form_service, task_request_service, user_service
 from core.form_service import FormServiceError
 from core.user_service import UserServiceError
 
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+DEV_MODE = os.environ.get("DEV_MODE", "1").strip().lower() in {"1", "true", "yes", "on"}
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+
 BASE_PATH = Path(__file__).resolve().parents[1]
-DATA_FILE = BASE_PATH / "data.json"
+DATA_FOLDER = os.environ.get("DATA_FOLDER", "").strip()
+DATA_FILE = Path(DATA_FOLDER) / "data.json" if DATA_FOLDER else BASE_PATH / "data.json"
 DEFAULT_FORM_VALUES: Dict[str, Any] = {
     "dok_no": "F-001",
     "rev_no": "00 / 06.05.24",
@@ -100,7 +109,8 @@ DEFAULT_FORM_DEFAULTS: Dict[str, str] = {
     "rev_no": "00 / 06.05.24",
 }
 
-UPLOAD_DIR = BASE_PATH / "uploads"
+_upload_folder = os.environ.get("UPLOAD_FOLDER", "").strip()
+UPLOAD_DIR = Path(_upload_folder) if _upload_folder else BASE_PATH / "uploads"
 
 _storage: Dict[str, Any] | None = None
 _dynamic_data: Dict[str, List[str]] | None = None
@@ -310,18 +320,65 @@ def set_form_defaults(defaults: Dict[str, str]) -> None:
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", SECRET_KEY)
 
-    user_service.ensure_default_users(base_path=str(BASE_PATH))
-    migrate_legacy_user_lists(base_path=str(BASE_PATH))
+    # ProxyFix: trust X-Forwarded-* headers from reverse proxy (Nginx)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    if DEV_MODE:
+        user_service.ensure_default_users(base_path=str(BASE_PATH))
+        migrate_legacy_user_lists(base_path=str(BASE_PATH))
+
     register_routes(app)
     return app
+
+
+def _auto_provision_user(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """JWT payload'ından kullanıcıyı oluştur veya güncelle, dict olarak döndür."""
+    portal_user_id = payload.get("user_id")
+    username = payload.get("username", "Bilinmeyen Kullanıcı")
+    role = payload.get("role", "calisan")
+    email = payload.get("email", "")
+
+    role_map = {"admin": "admin", "atayan": "atayan", "calisan": "calisan"}
+    local_role = role_map.get(role, "calisan")
+
+    existing = user_service.get_user_by_portal_id(portal_user_id, base_path=str(BASE_PATH))
+    if existing:
+        if existing.role != local_role:
+            user_service.update_user_role(existing.id, local_role, base_path=str(BASE_PATH))
+        return {
+            "id": existing.id,
+            "full_name": existing.full_name,
+            "email": existing.email or email,
+            "role": local_role,
+        }
+
+    new_user = user_service.create_user(
+        full_name=username,
+        email=email or None,
+        phone=None,
+        password=None,
+        role=local_role,
+        portal_user_id=portal_user_id,
+        base_path=str(BASE_PATH),
+    )
+    return {
+        "id": new_user.id,
+        "full_name": new_user.full_name,
+        "email": new_user.email or email,
+        "role": new_user.role,
+    }
 
 
 def register_routes(app: Flask) -> None:
     total_steps = len(FORM_STEPS)
 
     def get_current_user() -> Dict[str, Any] | None:
+        # Production: JWT middleware sets g.user
+        if hasattr(g, "user") and g.user:
+            return g.user
+        # Dev mode: session-based auth
         user_data = session.get("user")
         if not isinstance(user_data, dict):
             return None
@@ -348,8 +405,10 @@ def register_routes(app: Flask) -> None:
 
     def require_login():
         if get_current_user() is None:
-            flash("Lütfen önce kendinizi seçin.", "warning")
-            return redirect(url_for("index"))
+            if DEV_MODE:
+                flash("Lütfen önce kendinizi seçin.", "warning")
+                return redirect(url_for("index"))
+            return "Oturum bulunamadı. Portal üzerinden giriş yapın.", 401
         return None
 
     def set_session_user(user_obj) -> None:
@@ -445,6 +504,32 @@ def register_routes(app: Flask) -> None:
             flash("Bu bölüme yalnızca admin kullanıcılar erişebilir.", "error")
             return redirect(url_for("index"))
         return None
+
+    # -- JWT authentication middleware (production) -------------------------
+    @app.before_request
+    def jwt_auth():
+        if DEV_MODE:
+            return  # Dev mode: session-based auth, skip JWT
+
+        # Allow static file requests without auth
+        if request.endpoint == "static":
+            return
+
+        token = request.cookies.get("delta_token")
+        if not token:
+            g.user = None
+            return
+
+        try:
+            payload = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except pyjwt.ExpiredSignatureError:
+            g.user = None
+            return
+        except pyjwt.InvalidTokenError:
+            g.user = None
+            return
+
+        g.user = _auto_provision_user(payload)
 
     @app.template_filter("to_html_date")
     def to_html_date(value: str) -> str:
