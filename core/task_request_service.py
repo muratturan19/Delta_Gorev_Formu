@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Dict, Iterable, List, Optional
 
-from .form_service import get_connection
+from .db import get_connection
 
 
 class TaskRequestError(Exception):
@@ -105,9 +105,9 @@ def _row_to_request(row) -> TaskRequest:
         notes=row["notes"],
         assigned_to_user_id=row["assigned_to_user_id"],
         converted_form_no=row["converted_form_no"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        converted_at=row["converted_at"],
+        created_at=str(row["created_at"]),
+        updated_at=str(row["updated_at"]),
+        converted_at=str(row["converted_at"]) if row["converted_at"] else None,
         requested_by_name=row["requested_by_name"],
         assigned_to_name=row["assigned_to_name"],
     )
@@ -160,7 +160,7 @@ def create_task_request(
     now = _now_str()
 
     with get_connection(base_path) as connection:
-        cursor = connection.execute(
+        request_id = connection.execute_returning_id(
             """
             INSERT INTO task_requests (
                 customer_name,
@@ -199,7 +199,6 @@ def create_task_request(
                 None,
             ),
         )
-        request_id = cursor.lastrowid
         connection.commit()
 
     created = get_task_request(request_id, base_path=base_path)
