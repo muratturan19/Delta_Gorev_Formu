@@ -257,15 +257,8 @@ def _ensure_schema_sqlite(conn: Connection) -> None:
         """
     )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_forms_assigned_to ON forms(assigned_to_user_id)"
-    )
-    conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_portal_id "
-        "ON users(portal_user_id) WHERE portal_user_id IS NOT NULL"
-    )
-
     # -- Lightweight SQLite migrations for older databases ---
+    # ALL column additions MUST run BEFORE index creation
     _sqlite_add_column_if_missing(conn, "users", "portal_user_id", "INTEGER")
     _sqlite_add_column_if_missing(conn, "task_requests", "converted_at", "TEXT")
     for col, defn in (
@@ -283,6 +276,15 @@ def _ensure_schema_sqlite(conn: Connection) -> None:
         ("assigned_at", "TEXT"),
     ):
         _sqlite_add_column_if_missing(conn, "forms", col, defn)
+
+    # -- Indexes (columns guaranteed to exist now) ---
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_forms_assigned_to ON forms(assigned_to_user_id)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_portal_id "
+        "ON users(portal_user_id) WHERE portal_user_id IS NOT NULL"
+    )
 
 
 def _sqlite_add_column_if_missing(
