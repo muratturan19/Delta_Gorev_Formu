@@ -4,3 +4,4 @@ form_config.json
 gorev_formu_*.xlsx
 .env
 uploads/
+forms.db
