@@ -2,6 +2,7 @@
 {% block title %}Ana Menü · Görev Formu Sistemi{% endblock %}
 
 {% block content %}
+{% if DEV_MODE %}
 <div class="modal-overlay {% if not current_user %}is-visible{% endif %}" id="welcome-modal" data-fixed="true">
     <div class="modal modal-welcome">
         <h2 class="modal-welcome-title">delta proje hidrolik</h2>
@@ -35,6 +36,7 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 {% if current_user %}
 <div class="home-hero">
@@ -204,7 +206,11 @@
 {% endif %}
 {% else %}
 <div class="login-placeholder">
+    {% if DEV_MODE %}
     <p>Devam etmek için lütfen açılan pencereden kullanıcı seçin.</p>
+    {% else %}
+    <p>Oturum bulunamadı. Lütfen portal üzerinden giriş yapın.</p>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

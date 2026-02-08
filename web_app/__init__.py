@@ -547,7 +547,7 @@ def register_routes(app: Flask) -> None:
 
     @app.context_processor
     def inject_user():  # pragma: no cover - template helper
-        return {"current_user": get_current_user()}
+        return {"current_user": get_current_user(), "DEV_MODE": DEV_MODE}
 
     @app.context_processor
     def inject_globals():  # pragma: no cover - template helper
@@ -680,6 +680,8 @@ def register_routes(app: Flask) -> None:
 
     @app.post("/login/select")
     def login_select():
+        if not DEV_MODE:
+            return "Bu sayfa portal modunda devre dışıdır.", 404
         user_id_raw = request.form.get("user_id", "").strip()
         if not user_id_raw.isdigit():
             flash("Lütfen bir kullanıcı seçin.", "warning")
@@ -705,6 +707,8 @@ def register_routes(app: Flask) -> None:
 
     @app.post("/login/password")
     def login_password():
+        if not DEV_MODE:
+            return "Bu sayfa portal modunda devre dışıdır.", 404
         pending = session.get("pending_login")
         if not isinstance(pending, dict) or "id" not in pending:
             flash("Lütfen önce kullanıcı seçin.", "warning")
@@ -732,6 +736,8 @@ def register_routes(app: Flask) -> None:
 
     @app.get("/login/cancel")
     def login_cancel():
+        if not DEV_MODE:
+            return "Bu sayfa portal modunda devre dışıdır.", 404
         session.pop("pending_login", None)
         session.pop("show_password_modal", None)
         flash("Giriş işlemi iptal edildi.", "info")

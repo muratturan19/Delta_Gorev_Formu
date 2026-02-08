@@ -23,7 +23,7 @@
                 <span class="role-badge role-{{ current_user.role }}">
                     {% if current_user.role == 'admin' %}Admin{% elif current_user.role == 'atayan' %}Atayan{% else %}Ekip Üyesi{% endif %}
                 </span>
-                <a class="button logout" href="{{ url_for('logout') }}">Çıkış Yap</a>
+                {% if DEV_MODE %}<a class="button logout" href="{{ url_for('logout') }}">Çıkış Yap</a>{% endif %}
             </div>
             {% endif %}
         </div>
@@ -54,7 +54,7 @@
                     {% if current_user.role == 'calisan' %}
                         <a href="{{ url_for('my_tasks') }}">🗂️ Görevlerim</a>
                     {% endif %}
-                    <a href="{{ url_for('logout') }}">🚪 Çıkış</a>
+                    {% if DEV_MODE %}<a href="{{ url_for('logout') }}">🚪 Çıkış</a>{% endif %}
                 {% endif %}
             </nav>
             {% if FORM_STEPS and form_no %}
