@@ -13,7 +13,7 @@ from typing import Any
 from . import create_app
 
 
-def _get_port(default: int = 5000) -> int:
+def _get_port(default: int = 5002) -> int:
     raw_port = os.environ.get("PORT", str(default))
     try:
         return int(raw_port)
