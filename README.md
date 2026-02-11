@@ -4,6 +4,11 @@ Delta Proje ekibinin saha görevlerini planlayıp kaydetmesini sağlayan Flask t
 Çok adımlı form sihirbazı sayesinde görev bilgilerini, personel listelerini, taşeron ve maliyet
 bilgilerini düzenleyip şirket formatına uygun Excel dosyalarına aktarabilirsiniz.
 
+### Güncel Durum (Şubat 2026) - "Tek Kod Tabanı" Entegrasyonu
+Bu proje, "Strateji 1: Smart Config" prensibine göre Delta Portal'a entegre edilmiştir.
+- **Portal Modu:** `deploy_gorev_smart.ps1` ile sunucuya atıldığında `APP_MODE=PORTAL` çevre değişkeniyle çalışır.
+- **Veri Güvenliği:** `forms.db` dosyası deployment sırasında silinmez.
+
 ## Öne Çıkan Özellikler
 - **Web tabanlı arayüz:** Tüm form adımlarını tarayıcı üzerinden takip edin, dilediğiniz adımda
 geri dönüp verileri güncelleyin.

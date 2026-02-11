@@ -210,6 +210,28 @@ def update_user_role(user_id: int, role: str, *, base_path: str = ".") -> None:
         connection.commit()
 
 
+def update_user_details(
+    user_id: int,
+    full_name: str,
+    email: Optional[str] = None,
+    *,
+    base_path: str = ".",
+) -> None:
+    """Kullanıcının adını ve e-postasını güncelle."""
+    with get_connection(base_path) as connection:
+        if email:
+             connection.execute(
+                "UPDATE users SET full_name = ?, email = ? WHERE id = ?",
+                (full_name, email, user_id),
+            )
+        else:
+             connection.execute(
+                "UPDATE users SET full_name = ? WHERE id = ?",
+                (full_name, user_id),
+            )
+        connection.commit()
+
+
 def ensure_default_users(*, base_path: str = ".") -> None:
     defaults = [
         {

@@ -23,7 +23,11 @@
                 <span class="role-badge role-{{ current_user.role }}">
                     {% if current_user.role == 'admin' %}Admin{% elif current_user.role == 'atayan' %}Atayan{% else %}Ekip Üyesi{% endif %}
                 </span>
-                {% if DEV_MODE %}<a class="button logout" href="{{ url_for('logout') }}">Çıkış Yap</a>{% endif %}
+                {% if IS_PORTAL %}
+                <a class="button logout" href="https://portal.deltaproje.com/logout">Çıkış</a>
+                {% else %}
+                <a class="button logout" href="{{ url_for('logout') }}">Çıkış</a>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -54,7 +58,9 @@
                     {% if current_user.role == 'calisan' %}
                         <a href="{{ url_for('my_tasks') }}">🗂️ Görevlerim</a>
                     {% endif %}
-                    {% if DEV_MODE %}<a href="{{ url_for('logout') }}">🚪 Çıkış</a>{% endif %}
+                    {% if IS_PORTAL %}
+                    <a href="https://portal.deltaproje.com">🔙 Portal'a Dön</a>
+                    {% endif %}
                 {% endif %}
             </nav>
             {% if FORM_STEPS and form_no %}

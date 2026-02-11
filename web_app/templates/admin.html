@@ -3,7 +3,10 @@
 
 {% block content %}
 <h2>🛠️ Admin Paneli</h2>
-<p>Buradan açılır menülerde kullanılan verileri düzenleyebilir veya yeni bir JSON dosyası yükleyebilirsiniz.</p>
+<div style="background: #e1f5fe; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+    <strong>Bilgi:</strong> Kullanıcı yönetimi (Ekleme/Silme/Yetkilendirme) artık Ana Portal üzerinden yapılmaktadır.
+    Bu sayfada sadece mevcut listeleri görüntüleyebilir ve seçim listelerini (JSON) güncelleyebilirsiniz.
+</div>
 
 <section class="form-card">
     <h3>Listeleri Düzenle</h3>
@@ -14,7 +17,7 @@
         <label for="default_rev_no">Varsayılan Revizyon</label>
         <input id="default_rev_no" name="default_rev_no" type="text" value="{{ form_defaults.rev_no }}" placeholder="00 / 06.05.24" required>
 
-        <p class="helper-text">Görev atama yetkilileri ve ekip üyesi listeleri artık aşağıdaki tablolardan yönetilmektedir.</p>
+        <p class="helper-text">Kullanıcılar Ana Portal üzerinden giriş yaptıklarında otomatik olarak eklenir. Yetkilendirme Portal üzerinden yapılır.</p>
 
         <label for="taseron_options">Taşeron Şirketler</label>
         <textarea id="taseron_options" name="taseron_options" rows="6">{{ data.taseron_options | join('\n') }}</textarea>
@@ -26,127 +29,13 @@
     </form>
 </section>
 
+{#
+<!-- Kullanıcılar artık Portal üzerinden yönetiliyor. Bu tablolar kafa karıştırmaması için gizlendi. -->
 <section class="form-card">
     <h3>👑 Admin Kullanıcıları</h3>
-    <div class="user-management">
-        <table class="user-table">
-            <thead>
-                <tr>
-                    <th>Ad Soyad</th>
-                    <th>E-posta</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in admin_users %}
-                <tr>
-                    <td>{{ user.full_name }}</td>
-                    <td>{{ user.email or '-' }}</td>
-                    <td>
-                        <form method="post" action="{{ url_for('admin_delete_user', user_id=user.id) }}">
-                            <button type="submit" class="button danger small">Sil</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="empty">Kayıtlı admin bulunmuyor.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <form method="post" action="{{ url_for('admin_create_user', role='admin') }}" class="stacked user-create">
-            <h4>Yeni Admin Ekle</h4>
-            <label for="admin_full_name">Ad Soyad</label>
-            <input id="admin_full_name" name="full_name" type="text" required>
-            <label for="admin_email">E-posta</label>
-            <input id="admin_email" name="email" type="email" required>
-            <label for="admin_password">Şifre (min 8 karakter)</label>
-            <input id="admin_password" name="password" type="password" minlength="8" required>
-            <button type="submit" class="button save">Admin Ekle</button>
-        </form>
-    </div>
+    ...
 </section>
-
-<section class="form-card">
-    <h3>🧑‍💼 Görev Atama Yetkilileri</h3>
-    <div class="user-management">
-        <table class="user-table">
-            <thead>
-                <tr>
-                    <th>Ad Soyad</th>
-                    <th>E-posta</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in assign_users %}
-                <tr>
-                    <td>{{ user.full_name }}</td>
-                    <td>{{ user.email or '-' }}</td>
-                    <td>
-                        <form method="post" action="{{ url_for('admin_delete_user', user_id=user.id) }}">
-                            <button type="submit" class="button danger small">Sil</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="empty">Kayıtlı görev atama yetkilisi bulunmuyor.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <form method="post" action="{{ url_for('admin_create_user', role='atayan') }}" class="stacked user-create">
-            <h4>Yeni Yetkili Ekle</h4>
-            <label for="assign_full_name">Ad Soyad</label>
-            <input id="assign_full_name" name="full_name" type="text" required>
-            <label for="assign_email">E-posta</label>
-            <input id="assign_email" name="email" type="email" required>
-            <label for="assign_password">Şifre (min 8 karakter)</label>
-            <input id="assign_password" name="password" type="password" minlength="8" required>
-            <button type="submit" class="button save">Yetkili Ekle</button>
-        </form>
-    </div>
-</section>
-
-<section class="form-card">
-    <h3>👥 Ekip Üyeleri</h3>
-    <div class="user-management">
-        <table class="user-table">
-            <thead>
-                <tr>
-                    <th>Ad Soyad</th>
-                    <th>E-posta</th>
-                    <th>Telefon</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in employee_users %}
-                <tr>
-                    <td>{{ user.full_name }}</td>
-                    <td>{{ user.email or '-' }}</td>
-                    <td>{{ user.phone or '-' }}</td>
-                    <td>
-                        <form method="post" action="{{ url_for('admin_delete_user', user_id=user.id) }}">
-                            <button type="submit" class="button danger small">Sil</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4" class="empty">Kayıtlı ekip üyesi bulunmuyor.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <form method="post" action="{{ url_for('admin_create_user', role='calisan') }}" class="stacked user-create">
-            <h4>Yeni Ekip Üyesi Ekle</h4>
-            <label for="employee_full_name">Ad Soyad</label>
-            <input id="employee_full_name" name="full_name" type="text" required>
-            <label for="employee_email">E-posta (opsiyonel)</label>
-            <input id="employee_email" name="email" type="email">
-            <label for="employee_phone">Telefon (opsiyonel)</label>
-            <input id="employee_phone" name="phone" type="text">
-            <button type="submit" class="button save">Ekip Üyesi Ekle</button>
-        </form>
-    </div>
-</section>
+#}
 
 <section class="form-card">
     <h3>JSON Dosyası Yükle</h3>

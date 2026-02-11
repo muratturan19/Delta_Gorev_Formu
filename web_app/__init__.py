@@ -23,6 +23,7 @@ from core.user_service import UserServiceError
 # ---------------------------------------------------------------------------
 DEV_MODE = os.environ.get("DEV_MODE", "1").strip().lower() in {"1", "true", "yes", "on"}
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+APP_MODE = os.environ.get("APP_MODE", "STANDALONE")  # PORTAL or STANDALONE
 
 BASE_PATH = Path(__file__).resolve().parents[1]
 DATA_FOLDER = os.environ.get("DATA_FOLDER", "").strip()
@@ -336,21 +337,44 @@ def create_app() -> Flask:
 def _auto_provision_user(payload: Dict[str, Any]) -> Dict[str, Any]:
     """JWT payload'ından kullanıcıyı oluştur veya güncelle, dict olarak döndür."""
     portal_user_id = payload.get("user_id")
-    username = payload.get("username", "Bilinmeyen Kullanıcı")
-    role = payload.get("role", "calisan")
+    # Portal "username" field is key "user", fallback to "username"
+    username = payload.get("user", payload.get("username", "Bilinmeyen Kullanıcı"))
     email = payload.get("email", "")
 
+    # Role logic
+    is_platform_admin = payload.get("is_platform_admin", False)
+    permissions = payload.get("permissions", {})
+    if isinstance(permissions, str):
+        try:
+             permissions = json.loads(permissions)
+        except:
+             permissions = {}
+    
+    # "gorev" specific role
+    gorev_role = permissions.get("gorev", "calisan") if isinstance(permissions, dict) else "calisan"
+    if gorev_role == "none":
+        gorev_role = "calisan" # Default low priv
+
     role_map = {"admin": "admin", "atayan": "atayan", "calisan": "calisan"}
-    local_role = role_map.get(role, "calisan")
+    local_role = role_map.get(gorev_role, "calisan")
+
+    if is_platform_admin:
+        local_role = "admin"
 
     existing = user_service.get_user_by_portal_id(portal_user_id, base_path=str(BASE_PATH))
     if existing:
+        # Update user details if changed
         if existing.role != local_role:
             user_service.update_user_role(existing.id, local_role, base_path=str(BASE_PATH))
+        
+        # Always sync name and email to what Portal provides
+        if existing.full_name != username or (email and existing.email != email):
+             user_service.update_user_details(existing.id, username, email, base_path=str(BASE_PATH))
+
         return {
             "id": existing.id,
-            "full_name": existing.full_name,
-            "email": existing.email or email,
+            "full_name": username, 
+            "email": email or existing.email,
             "role": local_role,
         }
 
@@ -558,6 +582,7 @@ def register_routes(app: Flask) -> None:
             "taseron_options": dynamic_data["taseron_options"],
             "arac_plaka_options": dynamic_data["arac_plaka_options"],
             "is_admin": has_role("admin"),
+            "IS_PORTAL": APP_MODE == "PORTAL",
         }
 
     @app.context_processor
